@@ -26,8 +26,10 @@ def get_spending_people(db: Session) -> tuple[SpendingPerson, ...]:
 
 def get_spending_report(db: Session, period: date) -> SpendingReport:
     people = get_spending_people(db)
-    if len(people) < 2:
-        raise ValueError("Deben existir dos integrantes activos para comparar el consumo.")
+    if len(people) != 2:
+        raise ValueError(
+            "Deben existir exactamente dos integrantes activos para comparar el consumo."
+        )
     canonical = canonical_categories(db)
     sources = []
     rows = db.execute(
@@ -70,4 +72,4 @@ def get_spending_report(db: Session, period: date) -> SpendingReport:
                 category.name,
             )
         )
-    return build_spending_report(period, people, sources)
+    return build_spending_report(period, (people[0], people[1]), sources)

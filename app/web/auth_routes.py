@@ -14,7 +14,6 @@ from app.core.db import get_db
 from app.core.security import (
     clear_failed_attempts,
     generate_csrf_token,
-    get_client_ip,
     is_rate_limited,
     record_failed_attempt,
     secure_cookies,
@@ -65,7 +64,7 @@ def login_action(
     db: Session = Depends(get_db),
 ) -> Response:
     """Procesa el formulario de inicio de sesión."""
-    client_ip = get_client_ip(request)
+    client_ip = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("user-agent")
 
     # 1. Validación CSRF (RN-38 y ARCHITECTURE § 4)

@@ -95,3 +95,32 @@ def test_csrf_endpoint_rejection_without_token():
     )
     assert resp_login.status_code == 403
     assert "csrf" in resp_login.json()["detail"].lower()
+
+
+def test_all_post_endpoints_require_csrf_or_auth():
+    """Verifica programáticamente que ninguna ruta POST se ejecute sin CSRF o autenticación."""
+    from fastapi.routing import APIRoute
+
+    client = TestClient(app)
+    post_routes: list[str] = []
+
+    def _collect_routes(routes):
+        for route in routes:
+            if isinstance(route, APIRoute) and "POST" in route.methods:
+                post_routes.append(route.path)
+            elif hasattr(route, "routes"):
+                _collect_routes(route.routes)
+
+    _collect_routes(app.routes)
+    assert len(post_routes) > 0, "Deben existir rutas POST registradas en la aplicación"
+
+    for path in post_routes:
+        # Enviar petición POST sin cookie ni token CSRF ni sesión
+        # Ignorar rutas con parámetros variables como {id}
+        if "{" in path:
+            continue
+        resp = client.post(path, data={}, follow_redirects=False)
+        # Debe ser rechazada o redirigida a login/setup, nunca procesada con 200 OK
+        assert resp.status_code in (302, 303, 400, 401, 403, 422), (
+            f"Ruta {path} vulnerable: permitió POST sin token ni sesión (HTTP {resp.status_code})"
+        )

@@ -50,32 +50,31 @@ def decrypt_secret(encrypted_text: str, key_material: str | None = None) -> str:
     # Formato v2 autenticado (Fernet)
     if encrypted_text.startswith("enc:v2:"):
         token = encrypted_text[7:].encode("ascii")
-        return f.decrypt(token).decode("utf-8")
+        try:
+            return f.decrypt(token).decode("utf-8")
+        except (InvalidToken, ValueError):
+            return ""
 
     # Formato legacy (intentar Fernet primero, luego fallback XOR para migración transparente)
     raw_payload = encrypted_text[4:]
     try:
         return f.decrypt(raw_payload.encode("ascii")).decode("utf-8")
-    except (InvalidToken, Exception):
-        # Fallback de compatibilidad retroactiva para tokens XOR generados previamente
-        key_str = key_material or settings.APP_SECRET_KEY or "fallback-salt-key-material"
-        legacy_key = hashlib.sha256(key_str.encode("utf-8")).digest()
-        try:
-            raw = base64.b64decode(raw_payload.encode("ascii"))
-            decrypted = bytes(b ^ legacy_key[i % len(legacy_key)] for i, b in enumerate(raw))
-            return decrypted.decode("utf-8")
-        except Exception:
-            return encrypted_text
+    except (InvalidToken, ValueError):
+        pass
+
+    # Fallback de compatibilidad retroactiva para tokens XOR generados previamente
+    key_str = key_material or settings.APP_SECRET_KEY or "fallback-salt-key-material"
+    legacy_key = hashlib.sha256(key_str.encode("utf-8")).digest()
+    try:
+        raw = base64.b64decode(raw_payload.encode("ascii"))
+        decrypted = bytes(b ^ legacy_key[i % len(legacy_key)] for i, b in enumerate(raw))
+        return decrypted.decode("utf-8")
+    except Exception:
+        return ""
 
 
 def get_client_ip(request: Request) -> str:
-    """Obtiene la IP real del cliente respetando cabeceras X-Forwarded-For detrás de proxy."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        # El primer valor es la IP real del cliente antes de cualquier proxy intermedio
-        client_part = forwarded.split(",")[0].strip()
-        if client_part:
-            return client_part
+    """Retorna la IP del cliente resuelta confiablemente por el servidor ASGI."""
     return request.client.host if request.client else "127.0.0.1"
 
 
