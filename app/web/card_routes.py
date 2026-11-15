@@ -50,9 +50,9 @@ def _render(
 
     token = request.cookies.get("csrf_token") or generate_csrf_token()
     response = templates.TemplateResponse(
-        request,
-        "cards/index.html",
-        {
+        request=request,
+        name="cards/index.html",
+        context={
             "current_user": _user(request),
             "user": _user(request),
             "csrf_token": token,
