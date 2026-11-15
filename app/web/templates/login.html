@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 3rem auto; padding: 1.5rem;">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+        <span style="font-size: 2.2rem;" aria-hidden="true">🔒</span>
+        <h2 style="margin: 0.5rem 0 0.25rem 0; font-size: 1.4rem;">Iniciar sesión</h2>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin: 0;">Finanzas en Pareja</p>
+    </div>
+    
+    {% if error %}
+    <div style="background-color: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #fca5a5; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem;">
+        ⚠️ {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/login" style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div>
+            <label for="username" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #cbd5e1;">
+                Usuario
+            </label>
+            <input 
+                type="text" 
+                id="username" 
+                name="username" 
+                value="{{ username | default('') }}" 
+                required 
+                autofocus
+                autocomplete="username"
+                style="width: 100%; min-height: 44px; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background-color: var(--bg-color); color: var(--text-color); font-size: 1rem;"
+            >
+        </div>
+
+        <div>
+            <label for="password" style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; color: #cbd5e1;">
+                Contraseña
+            </label>
+            <input 
+                type="password" 
+                id="password" 
+                name="password" 
+                required 
+                autocomplete="current-password"
+                style="width: 100%; min-height: 44px; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border); background-color: var(--bg-color); color: var(--text-color); font-size: 1rem;"
+            >
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; margin-top: 0.5rem; min-height: 44px; font-weight: 600;">
+            Ingresar
+        </button>
+    </form>
+
+    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.06); text-align: center;">
+        <p style="margin: 0; font-size: 0.78rem; color: #64748b; line-height: 1.4;">
+            ✨ Asistente IA con dictado por voz integrado.<br>Podés activar o actualizar tu API Key de Gemini desde la sección <strong>Ajustes</strong>.
+        </p>
+    </div>
+</div>
+{% endblock %}

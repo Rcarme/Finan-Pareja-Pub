@@ -1,0 +1,138 @@
+"""Rutas del asistente de configuración inicial (/setup)."""
+
+from fastapi import APIRouter, Depends, Form, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+
+from app.core.auth import create_session
+from app.core.db import get_db
+from app.core.middleware import invalidate_onboarding_cache
+from app.core.security import generate_csrf_token, secure_cookies, validate_csrf
+from app.services.setup_service import initialize_instance, is_onboarded
+
+setup_router = APIRouter(prefix="/setup", tags=["setup"])
+
+
+@setup_router.get("", response_class=HTMLResponse)
+async def setup_page(request: Request, db: Session = Depends(get_db)) -> Response:
+    if is_onboarded(db):
+        return RedirectResponse(url="/login", status_code=302)
+
+    from app.web.app import templates
+
+    csrf_token = generate_csrf_token()
+    response = templates.TemplateResponse(
+        "setup.html",
+        {
+            "request": request,
+            "csrf_token": csrf_token,
+            "error": None,
+        },
+    )
+    response.set_cookie(
+        "csrf_token",
+        csrf_token,
+        httponly=False,
+        samesite="lax",
+        secure=secure_cookies(),
+    )
+    return response
+
+
+@setup_router.post("", response_class=HTMLResponse)
+async def process_setup(
+    request: Request,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+    user1_username: str = Form(...),
+    user1_display_name: str = Form(""),
+    user1_password: str = Form(...),
+    user2_username: str = Form(...),
+    user2_display_name: str = Form(""),
+    user2_password: str = Form(...),
+    currency: str = Form("ARS"),
+    split_pct: int = Form(50),
+    business_enabled: bool = Form(False),
+    business_name: str = Form(""),
+    gemini_api_key: str = Form(""),
+    seed_defaults: bool = Form(True),
+) -> Response:
+    if is_onboarded(db):
+        return RedirectResponse(url="/login", status_code=302)
+
+    if not validate_csrf(request, csrf_token):
+        from app.web.app import templates
+
+        return templates.TemplateResponse(
+            "setup.html",
+            {
+                "request": request,
+                "csrf_token": generate_csrf_token(),
+                "error": "El token de seguridad expiró. Por favor, recargá e intentá nuevamente.",
+            },
+            status_code=400,
+        )
+
+    try:
+        user1, _ = initialize_instance(
+            db,
+            user1_username=user1_username,
+            user1_display_name=user1_display_name,
+            user1_password=user1_password,
+            user2_username=user2_username,
+            user2_display_name=user2_display_name,
+            user2_password=user2_password,
+            currency=currency,
+            split_pct=split_pct,
+            gemini_api_key=gemini_api_key,
+            business_enabled=business_enabled,
+            business_name=business_name,
+            seed_defaults=seed_defaults,
+        )
+        invalidate_onboarding_cache()
+
+        # Iniciar sesión automáticamente con el usuario 1
+        raw_token, _session_record = create_session(
+            db,
+            user_id=user1.id,
+            user_agent=request.headers.get("user-agent"),
+        )
+        response = RedirectResponse(url="/s/home", status_code=302)
+        response.set_cookie(
+            "session_id",
+            raw_token,
+            httponly=True,
+            samesite="lax",
+            secure=secure_cookies(),
+        )
+        return response
+
+    except ValueError as exc:
+        from app.web.app import templates
+
+        new_csrf = generate_csrf_token()
+        resp = templates.TemplateResponse(
+            "setup.html",
+            {
+                "request": request,
+                "csrf_token": new_csrf,
+                "error": str(exc),
+                "form": {
+                    "user1_username": user1_username,
+                    "user1_display_name": user1_display_name,
+                    "user2_username": user2_username,
+                    "user2_display_name": user2_display_name,
+                    "currency": currency,
+                    "split_pct": split_pct,
+                    "business_enabled": business_enabled,
+                    "business_name": business_name,
+                    "gemini_api_key": "",
+                    "seed_defaults": seed_defaults,
+                },
+            },
+            status_code=400,
+        )
+        resp.set_cookie(
+            "csrf_token", new_csrf, httponly=False, samesite="lax", secure=secure_cookies()
+        )
+        return resp

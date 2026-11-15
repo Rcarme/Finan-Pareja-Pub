@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card" style="max-width: 500px; margin: 0 auto;">
+    <div class="card-header">
+        <h2 class="card-title">Pagar Vencimiento (RN-28)</h2>
+        <a href="/obligations" style="color: var(--text-muted); text-decoration: none; font-size: 0.85rem;">← Volver</a>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <!-- Resumen del vencimiento -->
+    <div style="background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.85rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <span style="font-weight: 600; font-size: 1.05rem;">
+                {{ item.due_period.strftime("%B %Y") | capitalize }}
+            </span>
+            {% if item.kind == 'refuerzo' %}
+            <span class="badge badge-user" style="background-color: rgba(168, 85, 247, 0.2); color: #c084fc;">Refuerzo</span>
+            {% else %}
+            <span class="badge badge-info">Cuota</span>
+            {% endif %}
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--text-muted);">
+            <span>Monto pactado:</span>
+            <span style="font-weight: 700; color: var(--text-color);">USD {{ item.usd_amount | decimal_ar }}</span>
+        </div>
+        {% if latest_fx %}
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+            <span>Cotización referencia:</span>
+            <span>$ {{ latest_fx.rate | fx_ar }} (estimado {{ estimated_ars | currency }})</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <form method="POST" action="/obligations/{{ item.id }}/pay" style="display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+
+        <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                Cuenta de origen *
+            </label>
+            <select name="account_id" required style="width: 100%; min-height: 44px; background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.5rem; border-radius: 0.5rem; font-size: 0.95rem;">
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}">{{ acc.name }} (Saldo: {{ acc.balance | currency }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                Monto real pagado en pesos ($ ARS) *
+            </label>
+            <input type="text" name="amount" inputmode="decimal" required autofocus
+                   value="{{ initial_amount }}"
+                   placeholder="Ej. 2.730.000,00"
+                   style="width: 100%; min-height: 44px; background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.5rem; border-radius: 0.5rem; font-size: 1.1rem; font-weight: 600;">
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; display: block;">
+                Se calculará automáticamente la cotización efectiva: ARS / USD con 4 decimales.
+            </span>
+        </div>
+
+        <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.3rem;">
+                Fecha de pago *
+            </label>
+            <input type="date" name="date" required value="{{ today_str }}"
+                   style="width: 100%; min-height: 44px; background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.5rem; border-radius: 0.5rem; font-size: 0.95rem;">
+        </div>
+
+        {% if item.kind == 'refuerzo' %}
+        <div style="background-color: rgba(56, 189, 248, 0.08); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem;">
+            <label style="display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer;">
+                <input type="checkbox" name="pay_from_envelope" value="true" checked style="margin-top: 0.25rem; width: 18px; height: 18px;">
+                <div>
+                    <span style="font-weight: 600; font-size: 0.9rem;">Pagar desde el sobre Refuerzos depto (RN-31)</span>
+                    <span style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.1rem;">
+                        Saldo disponible en el sobre: {{ envelope_balance | currency }}. Descuenta del Fondo y del sobre, manteniendo el Disponible inalterado.
+                    </span>
+                </div>
+            </label>
+        </div>
+        {% endif %}
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+            <a href="/obligations" class="btn btn-secondary" style="flex: 1;">Cancelar</a>
+            <button type="submit" class="btn btn-primary" style="flex: 2;">Confirmar Pago</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

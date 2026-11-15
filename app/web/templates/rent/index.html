@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.35rem; font-weight: 700;">🏠 Contrato de Alquiler</h1>
+    <span class="badge {% if contract.active %}badge-income{% else %}badge-voided{% endif %}">
+        {% if contract.active %}Vigente{% else %}Inactivo{% endif %}
+    </span>
+</div>
+
+{% if success == 'cobro_registrado' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Cobro de alquiler registrado exitosamente en el libro contable.
+</div>
+{% elif success == 'ajuste_registrado' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Ajuste de alquiler registrado exitosamente en el historial.
+</div>
+{% elif error %}
+<div class="alert alert-danger" style="margin-bottom: 1rem;">
+    ⚠️ Error: {{ error }}
+</div>
+{% endif %}
+
+<!-- Estado y Alertas del Período -->
+{% if summary.has_adjust_reminder %}
+<div class="alert {% if summary.adjust_alert_status == 'overdue' %}alert-danger{% else %}alert-warning{% endif %}" style="margin-bottom: 1rem;">
+    {% if summary.adjust_alert_status == 'overdue' %}
+        <strong>⚠️ Ajuste de alquiler vencido:</strong> El ajuste trimestral debió realizarse el {{ contract.next_adjust_date | date }}.
+    {% else %}
+        <strong>🔔 Próximo ajuste cercano:</strong> Programado para el {{ contract.next_adjust_date | date }} (dentro de los próximos 7 días).
+    {% endif %}
+</div>
+{% endif %}
+
+{% if summary.has_missing_collection_alert %}
+<div class="alert alert-danger" style="margin-bottom: 1rem;">
+    <strong>⚠️ Cobro faltante:</strong> Ha pasado el día 5 del período {{ period_display }} sin cobro de alquiler registrado.
+</div>
+{% elif summary.is_collected %}
+<div class="alert alert-success" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+    <span>✓</span>
+    <div>
+        <strong>Alquiler cobrado en {{ period_display }}:</strong> Registrado por {{ summary.collection_transaction.amount | currency }} el {{ summary.collection_transaction.date | date }}.
+    </div>
+</div>
+{% endif %}
+
+<!-- Tarjeta de Contrato Vigente (RN-32) -->
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+        <h2 class="card-title">Datos del Contrato</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+        <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Monto Vigente</span>
+            <div style="font-size: 1.3rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">
+                {{ contract.current_amount | currency }}
+            </div>
+        </div>
+        <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Frecuencia</span>
+            <div style="font-size: 1.1rem; font-weight: 600; margin-top: 0.2rem;">
+                Cada {{ contract.adjust_every_months }} meses
+            </div>
+        </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+        <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Último ajuste:</span>
+            <div style="font-weight: 600;">{{ contract.last_adjust_date | date }}</div>
+        </div>
+        <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Próximo ajuste:</span>
+            <div style="font-weight: 600; color: {% if summary.has_adjust_reminder %}var(--warning){% else %}inherit{% endif %};">
+                {{ contract.next_adjust_date | date }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración inicial o edición de parámetros del contrato (T12.14) -->
+    <details style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+        <summary style="font-size: 0.85rem; color: var(--primary); cursor: pointer; font-weight: 600;">
+            ⚙️ Configurar contrato inicial / frecuencia
+        </summary>
+        <form method="POST" action="/rent/contract" style="margin-top: 0.75rem;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+                <div class="form-group">
+                    <label class="form-label" for="cfg_current_amount">Monto Inicial ($)</label>
+                    <input type="text" inputmode="decimal" name="current_amount" id="cfg_current_amount" class="form-control" value="{{ contract.current_amount | decimal_ar }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg_freq">Frecuencia (meses)</label>
+                    <input type="number" name="adjust_every_months" id="cfg_freq" class="form-control" min="1" max="24" value="{{ contract.adjust_every_months }}" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cfg_last_adj">Último Ajuste</label>
+                    <input type="date" name="last_adjust_date" id="cfg_last_adj" class="form-control" value="{{ contract.last_adjust_date.isoformat() }}">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-secondary" style="width: 100%;">Guardar Contrato</button>
+        </form>
+    </details>
+</div>
+
+<!-- Formulario de Cobro del Mes (RN-32) -->
+{% if not summary.is_collected %}
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+        <h2 class="card-title">💵 Registrar Cobro de Alquiler</h2>
+    </div>
+    <form method="POST" action="/rent/collection">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="period" value="{{ period_str }}">
+
+        <div class="form-group">
+            <label class="form-label" for="account_id">Cuenta de Ingreso</label>
+            <select name="account_id" id="account_id" class="form-control" required>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}">{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+                <label class="form-label" for="payment_date">Fecha de Cobro</label>
+                <input type="date" name="payment_date" id="payment_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="amount">Monto ($)</label>
+                <input type="text" inputmode="decimal" name="amount" id="amount" class="form-control" value="{{ contract.current_amount | decimal_ar }}" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 0.5rem; font-weight: 600;">
+            ✓ Registrar Cobro de {{ contract.current_amount | currency }}
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Formulario de Ajuste Manual por IPC (RN-33) -->
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+        <h2 class="card-title">📈 Registrar Ajuste por IPC</h2>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        Cargá el nuevo monto pactado y opcionalmente el porcentaje de IPC informado. El sistema recalculará la próxima fecha para dentro de {{ contract.adjust_every_months }} meses.
+    </p>
+    <form method="POST" action="/rent/adjustment">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+                <label class="form-label" for="adjust_date">Fecha del Ajuste</label>
+                <input type="date" name="adjust_date" id="adjust_date" class="form-control" value="{{ today_str }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new_amount">Nuevo Monto ($)</label>
+                <input type="text" inputmode="decimal" name="new_amount" id="new_amount" class="form-control" placeholder="ej. 850.000,00" required>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.75rem;">
+            <div class="form-group">
+                <label class="form-label" for="ipc_pct">% IPC (opcional)</label>
+                <input type="text" inputmode="decimal" name="ipc_pct" id="ipc_pct" class="form-control" placeholder="ej. 14,20">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="note">Nota / Observación</label>
+                <input type="text" name="note" id="note" class="form-control" placeholder="ej. Trimestre mayo-julio">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; font-weight: 600;">
+            + Guardar Ajuste de Alquiler
+        </button>
+    </form>
+</div>
+
+<!-- Historial Inmutable de Ajustes (RN-33) -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📜 Historial de Ajustes</h2>
+    </div>
+    {% if history %}
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for adj in history %}
+        <div style="background-color: var(--input-bg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <span style="font-weight: 600; font-size: 0.95rem;">{{ adj.date | date }}</span>
+                <span style="font-weight: 700; color: var(--success); font-size: 1.05rem;">{{ adj.new_amount | currency }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                <span>Anterior: {{ adj.old_amount | currency }}</span>
+                {% if adj.ipc_pct %}
+                <span>IPC: {{ adj.ipc_pct }}%</span>
+                {% endif %}
+            </div>
+            {% if adj.note %}
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem; font-style: italic;">
+                "{{ adj.note }}"
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 1rem 0;">
+        No hay ajustes registrados aún en el historial.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+<form method="post" action="/settings/categories/{{ category.id }}/owner" class="simple-form settings-appearance-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}"><input type="hidden" name="expected_version" value="{{ category.version }}"><input type="hidden" name="return_to" value="{{ '/s/settings' if nav is defined else '/settings' }}">
+<label for="category-owner-{{ category.id }}">¿De quién es esta categoría?</label>
+<select id="category-owner-{{ category.id }}" name="owner_user_id" class="form-control"><option value="" {% if not category.owner_user_id %}selected{% endif %}>Común</option>{% for person in users %}<option value="{{ person.id }}" {% if category.owner_user_id == person.id %}selected{% endif %}>{{ person.display_name }}</option>{% endfor %}</select>
+<label for="category-activity-{{ category.id }}">Actividad</label>
+<select id="category-activity-{{ category.id }}" name="activity" class="form-control"><option value="household" {% if category.activity not in ('business', 'personal') %}selected{% endif %}>Hogar</option><option value="business" {% if category.activity == 'business' %}selected{% endif %}>Negocio / Emprendimiento</option><option value="personal" {% if category.activity == 'personal' %}selected{% endif %}>Personal ya repartido</option></select>
+<p class="category-icon-help">No cambia a quién se le descuenta el gasto ni cómo se reparte el ingreso.</p>
+<button type="submit" class="secondary-button btn btn-secondary settings-action">Guardar visibilidad</button>
+</form>

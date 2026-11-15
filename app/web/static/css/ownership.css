@@ -1,0 +1,27 @@
+.ownership-form {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.ownership-form label {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.ownership-form input:not([type="hidden"]):not([type="checkbox"]),
+.ownership-form select,
+.ownership-form textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.65rem;
+  color: var(--text-color);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+}
+.ownership-form .form-group { min-width: 0; }
+
+.account-name { overflow-wrap: anywhere; max-width: 13rem; }
+
+.category-visibility { display: flex; align-items: center; gap: .6rem; min-height: 44px; }
+.category-visibility input { width: auto; }

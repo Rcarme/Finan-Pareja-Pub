@@ -1,0 +1,3 @@
+[data-install-button][hidden], [data-connection-status][hidden] {
+    display: none !important;
+}

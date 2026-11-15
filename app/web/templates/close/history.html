@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">
+            📚 Historial de Cierres de Mes
+        </h2>
+        <a href="/close/wizard" class="btn btn-primary btn-sm">+ Nuevo cierre</a>
+    </div>
+
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;">
+        Registro de períodos contables, estado de cierre y snapshots auditados (RN-24, RN-37).
+    </p>
+
+    {% if periods %}
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for p in periods %}
+        <div style="background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <strong style="font-size: 1rem; color: var(--text-color);">
+                        {{ p.period.strftime('%Y-%m') }}
+                    </strong>
+                    <span class="badge {% if p.status == 'closed' %}badge-success{% else %}badge-info{% endif %}">
+                        {{ "Cerrado" if p.status == "closed" else "Abierto" }}
+                    </span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                    {% if p.status == 'closed' and p.closed_at %}
+                    Cerrado el {{ p.closed_at | date }}
+                    {% else %}
+                    Período contable abierto
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                {% if p.status == 'closed' %}
+                <a href="/close/{{ p.period.strftime('%Y-%m-%d') }}" class="btn btn-secondary btn-sm" style="min-height: 44px; display: inline-flex; align-items: center;">
+                    Ver detalle
+                </a>
+                {% else %}
+                <a href="/close/wizard?step=1&period={{ p.period.strftime('%Y-%m-%d') }}" class="btn btn-primary btn-sm" style="min-height: 44px; display: inline-flex; align-items: center;">
+                    Cerrar mes
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">
+        Aún no hay períodos registrados en el sistema.
+    </p>
+    {% endif %}
+
+    <div style="margin-top: 1.5rem; text-align: center;">
+        <a href="/" class="btn btn-outline btn-sm">← Volver al inicio</a>
+    </div>
+</div>
+{% endblock %}

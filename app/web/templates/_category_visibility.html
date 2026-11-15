@@ -1,0 +1,2 @@
+<label class="category-visibility"><input type="checkbox" name="show_all_categories" value="1" data-category-visibility data-current-user="{{ user.id }}" {% if values is defined and values.get('show_all_categories') %}checked{% elif show_all_categories|default(false) %}checked{% endif %}> Ver todas</label>
+<p class="category-icon-help">Primero se muestran tus categorías y las comunes. Podés cargar una del otro con Ver todas.</p>

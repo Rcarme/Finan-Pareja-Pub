@@ -1,0 +1,10 @@
+# Configuración oficial de Gitleaks para Finanzas en Pareja
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Permitir archivos de entorno de ejemplo y tests unitarios sin secretos reales"
+paths = [
+    '''\.env\.example$''',
+    '''tests/.*''',
+]

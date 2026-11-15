@@ -1,0 +1,89 @@
+{% extends "simple/base.html" if simple_view else "base.html" %}
+{% block head %}<link rel="stylesheet" href="/static/css/spending.css">{% endblock %}
+{% block content %}
+<div class="spending-page">
+  <header class="spending-heading">
+    <div><p class="spending-eyebrow">Consumo personal y común</p><h1>Quién gastó</h1></div>
+    <form method="get" action="{{ path }}" class="spending-month">
+      <label for="spending-period">Mes contable<input id="spending-period" name="period" type="month" value="{{ report.period.strftime('%Y-%m') }}" required></label>
+      <input name="group" type="hidden" value="{{ group }}"><button type="submit">Ver mes</button>
+    </form>
+  </header>
+  <p class="spending-muted">Según a quién está cargado cada gasto, independientemente de la tarjeta o de quién lo registró.</p>
+
+  <section class="spending-card spending-total" aria-label="Total del mes">
+    <p>Gasto neto · {{ report.period.strftime('%m/%Y') }}</p>
+    <strong class="spending-total-amount">{{ report.total_net|currency }}</strong>
+    <div class="spending-meta"><span>Gastos {{ report.total_expense|currency }}</span><span>Devoluciones {{ report.total_refunds|currency }}</span></div>
+  </section>
+
+  <section class="spending-summary" aria-label="Distribución por destino del gasto">
+    {% for bucket in report.buckets %}
+    <a class="spending-card spending-bucket spending-bucket-{{ bucket.key }}" href="{{ spending_link(bucket.key) }}">
+      <div class="spending-card-heading"><h2>{{ bucket.name }}</h2><span>{% if bucket.percentage is not none %}{{ bucket.percentage|decimal_ar }} %{% else %}—{% endif %}</span></div>
+      <strong class="spending-bucket-amount">{{ bucket.net|currency }}</strong>
+      <div class="spending-meta"><span>Gastos {{ bucket.expense|currency }}</span><span>Devoluciones {{ bucket.refunds|currency }}</span></div>
+      <span class="spending-link-hint">Ver movimientos →</span>
+    </a>
+    {% endfor %}
+  </section>
+  {% if not report.percentages_available %}<p class="spending-note">Los porcentajes no aplican cuando no hay gasto neto positivo o las devoluciones superan los gastos de algún grupo.</p>{% else %}<p class="spending-muted spending-small">Porcentaje sobre el gasto neto total. Los porcentajes redondeados pueden no sumar exactamente 100 %.</p>{% endif %}
+
+  {% if retirement.month_ledger_total %}
+  <aside class="spending-card external-retirement"><h2>Ahorro externo dentro de los egresos</h2><strong>{{ retirement.month_ledger_total|currency }}</strong><p class="spending-muted">Aportes a retiro de este mes, ya incluidos en los grupos anteriores según su atribución. Este seguimiento no suma otro gasto ni otra reserva. Los antecedentes externos no se agregan a estos egresos.</p><a href="{{ '/s/retirement' if simple_view else '/envelopes/retirement' }}?period={{ report.period.strftime('%Y-%m') }}">Ver aportes e histórico →</a></aside>
+  {% endif %}
+
+  <section class="spending-card" aria-labelledby="spending-shares-title">
+    <h2 id="spending-shares-title">Sumando la mitad de lo común</h2>
+    <p class="spending-muted">Una comparación informativa: gastos propios netos + mitad de los gastos comunes netos. No es el reparto oficial del cierre ni modifica saldos.</p>
+    <div class="spending-shares">
+    {% for share in report.shares %}
+      <article class="spending-share">
+        <h3>{{ share.name }}</h3>
+        <dl><div><dt>Propios netos</dt><dd>{{ share.own_net|currency }}</dd></div><div><dt>Mitad de lo común</dt><dd>{{ share.common_share|currency }}</dd></div></dl>
+        <div class="spending-share-total"><strong>{{ share.total|currency }}</strong><span>{% if share.percentage is not none %}{{ share.percentage|decimal_ar }} %{% else %}—{% endif %}</span></div>
+      </article>
+    {% endfor %}
+    </div>
+    {% if report.rounding_residual != 0 %}<p class="spending-note">Queda {{ report.rounding_residual|currency }} de redondeo común sin asignar a ninguno. Se informa aparte para conservar cada centavo.</p>{% endif %}
+  </section>
+
+  <section class="spending-card" aria-labelledby="spending-categories-title">
+    <h2 id="spending-categories-title">En qué se fue</h2>
+    <p class="spending-muted">Tocá una categoría para ver sus gastos y devoluciones.</p>
+    {% for bucket in report.buckets %}
+    <details class="spending-categories" {% if group == 'all' or group == bucket.key %}open{% endif %}>
+      <summary>{{ bucket.name }} <strong>{{ bucket.net|currency }}</strong></summary>
+      {% for category in bucket.categories %}
+      <a class="spending-category-row" href="{{ spending_link(bucket.key, category.category_id) }}"><span>{{ category.category_name }}<small>{{ category.count }} movimiento{{ 's' if category.count != 1 else '' }}</small></span><strong>{{ category.net|currency }}</strong></a>
+      {% else %}<p class="spending-muted spending-small">Sin consumos en este mes.</p>{% endfor %}
+    </details>
+    {% endfor %}
+  </section>
+
+  <section class="spending-card" id="spending-detail" aria-labelledby="spending-detail-title">
+    <h2 id="spending-detail-title">Movimientos del detalle</h2>
+    <form method="get" action="{{ path }}#spending-detail" class="spending-filters">
+      <input name="period" type="hidden" value="{{ report.period.strftime('%Y-%m') }}">
+      <label for="spending-group">Destino<select id="spending-group" name="group"><option value="all" {% if group == 'all' %}selected{% endif %}>Todos</option>{% for bucket in report.buckets %}<option value="{{ bucket.key }}" {% if group == bucket.key %}selected{% endif %}>{{ bucket.name }}</option>{% endfor %}</select></label>
+      <label for="spending-category">Categoría<select id="spending-category" name="category_id"><option value="">Todas</option>{% for identity, name in categories %}<option value="{{ identity }}" {% if category_id == identity %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></label>
+      <button type="submit">Filtrar</button>
+    </form>
+    <p class="spending-muted spending-small">{{ filtered_count }} movimiento{{ 's' if filtered_count != 1 else '' }} · Página {{ page }}. Los filtros cambian el detalle; los totales siguen mostrando el mes completo.</p>
+    {% for entry in entries %}
+    <a class="spending-movement" href="{{ '/s/' if simple_view else '/transactions/' }}{{ entry.transaction_id }}">
+      <span><strong>{{ entry.description }}</strong><small>{{ entry.date|date }} · {{ entry.category_name }}</small><small>{{ 'Devolución' if entry.kind == 'income' else 'Gasto' }} · {% for bucket in report.buckets %}{% if bucket.key == entry.group_key %}{{ bucket.name }}{% endif %}{% endfor %}</small></span>
+      <strong class="{% if entry.kind == 'income' %}spending-refund{% endif %}">{{ entry.net_amount|currency }}</strong>
+    </a>
+    {% else %}<p class="spending-empty">No hay consumos que coincidan con estos filtros.</p>{% endfor %}
+    {% if previous_url or next_url %}<nav class="spending-pagination" aria-label="Páginas del detalle">{% if previous_url %}<a href="{{ previous_url }}">← Anterior</a>{% endif %}{% if next_url %}<a href="{{ next_url }}">Siguiente →</a>{% endif %}</nav>{% endif %}
+  </section>
+
+  <aside class="spending-card spending-scope" aria-label="Alcance del reporte">
+    <h2>Qué incluye</h2>
+    <p>Movimientos activos en pesos por mes contable, incluidos los gastos de dinero personal ya asignado. Las devoluciones importadas y las registradas en «Reintegros de tarjeta» se descuentan del grupo correspondiente.</p>
+    <p>Los ajustes de conciliación, pagos de tarjeta, transferencias, cuotas futuras y USD sin liquidar quedan fuera del consumo. Los saldos iniciales no se cuentan como gastos nuevos.</p>
+    <p>La negocio / emprendimiento se consulta <a href="{{ '/s/business' if simple_view else '/business' }}">por separado</a>. Este reporte es informativo y no calcula lo que recibe cada uno al cierre.</p>
+  </aside>
+</div>
+{% endblock %}

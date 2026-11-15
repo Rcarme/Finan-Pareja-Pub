@@ -1,0 +1,31 @@
+{% extends "simple/base.html" %}
+{% block content %}
+{% include "_installation.html" %}
+<h1>Configuración</h1>
+{% if error %}<div class="alert-error" role="alert">{{ error }}</div>{% endif %}
+<section class="simple-card"><h2>Tu vista</h2><form method="post" action="/s/settings/mode" class="simple-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}"><label for="mode">Cómo querés usar la app</label><select id="mode" name="mode"><option value="simple" {% if user.ui_mode == 'simple' %}selected{% endif %}>Simple</option><option value="full" {% if user.ui_mode == 'full' %}selected{% endif %}>Completa</option></select><button type="submit" class="primary-button wide">Guardar preferencia</button></form><a href="/full" class="text-link">Abrir vista completa ahora</a></section>
+<section class="simple-card">
+<h2>Menú de navegación personal</h2>
+<p class="muted">Elegí qué botones querés tener visibles en tu barra inferior:</p>
+<form method="post" action="/s/settings/navigation" class="simple-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<div style="display: flex; flex-direction: column; gap: 0.65rem; margin: 0.6rem 0 1rem 0;">
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="home" {% if user.has_nav('home') %}checked{% endif %} style="width: 20px; height: 20px;"><span>⌂ <strong>Inicio</strong> (resumen, balances y últimos movimientos)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="list" {% if user.has_nav('list') %}checked{% endif %} style="width: 20px; height: 20px;"><span>≡ <strong>Movimientos</strong> (historial completo y buscador)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="spending" {% if user.has_nav('spending') %}checked{% endif %} style="width: 20px; height: 20px;"><span>◔ <strong>Quién gastó</strong> (análisis de gastos por persona)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="cards" {% if user.has_nav('cards') %}checked{% endif %} style="width: 20px; height: 20px;"><span>💳 <strong>Tarjetas</strong> (cuotas pendientes y vencimientos)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="close" {% if user.has_nav('close') %}checked{% endif %} style="width: 20px; height: 20px;"><span>📅 <strong>Cierres</strong> (estado del mes y compensación)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="envelopes" {% if user.has_nav('envelopes') %}checked{% endif %} style="width: 20px; height: 20px;"><span>✉️ <strong>Sobres</strong> (ahorros reservados por meta)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="business" {% if user.has_nav('business') %}checked{% endif %} style="width: 20px; height: 20px;"><span>✂ <strong>Negocio / Emprendimiento</strong> (negocio y rendición)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="ai" {% if user.has_nav('ai') %}checked{% endif %} style="width: 20px; height: 20px;"><span>✨ <strong>Asistente IA</strong> (carga rápida por texto o tickets)</span></label>
+<label style="display: flex; align-items: center; gap: 0.65rem; cursor: pointer; min-height: 40px;"><input type="checkbox" name="modules" value="new" {% if user.has_nav('new') %}checked{% endif %} style="width: 20px; height: 20px;"><span>＋ <strong>Cargar gasto</strong> (formulario manual directo)</span></label>
+</div>
+<button type="submit" class="primary-button wide">Guardar menú</button>
+</form>
+</section>
+<section class="simple-card"><h2>Aspecto de las categorías</h2><p class="muted">Los cambios de icono y color se ven en ambas vistas.</p>{% for category in categories %}<details class="appearance-category"><summary>{% include "simple/_icon.html" %}{{ category_label(category.name) }} · {% include "_category_owner_label.html" %}</summary>{% include "_category_owner_form.html" %}<form method="post" action="/s/settings/category/{{ category.id }}" class="simple-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}">{% include "_category_icon_field.html" %}<label for="color_{{ category.id }}">Color</label><select id="color_{{ category.id }}" name="color">{% for value,label in colors.items() %}<option value="{{ value }}" {% if category.color == value %}selected{% endif %}>{{ {'blue':'Celeste','green':'Verde','amber':'Ámbar','rose':'Rosa','violet':'Violeta','teal':'Turquesa','slate':'Gris'}[value] }}</option>{% endfor %}</select><button type="submit" class="secondary-button wide">Guardar aspecto</button></form></details>{% endfor %}</section>
+<a href="/settings" class="secondary-button wide">Configuración completa</a>
+<form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="secondary-button wide">Cerrar sesión</button></form>
+{% endblock %}
+
+

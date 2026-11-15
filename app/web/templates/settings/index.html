@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block head %}<link rel="stylesheet" href="/static/css/simple-settings.css">{% endblock %}
+
+{% block content %}
+<p><a href="/settings/ownership" class="btn">Revisar apertura: personales, ahorro y cuentas reales</a></p>
+{% include "_installation.html" %}
+<div class="card">
+    <div class="card-header"><h2 class="card-title">Tu vista de la app</h2></div>
+    <form method="post" action="/s/settings/mode">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+        <label class="form-label" for="ui_mode">Vista preferida</label>
+        <select class="form-control" id="ui_mode" name="mode">
+            <option value="full" {% if user.ui_mode == 'full' %}selected{% endif %}>Completa</option>
+            <option value="simple" {% if user.ui_mode == 'simple' %}selected{% endif %}>Simple</option>
+        </select>
+        <button class="btn btn-primary settings-action" type="submit">Guardar mi vista</button>
+    </form>
+    <a class="btn btn-secondary settings-action" href="/s">Abrir vista simple</a>
+</div>
+
+<div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2 class="card-title">✨ Asistente IA (Google Gemini)</h2></div>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0;">
+        Configurá tu clave de API de Google Gemini para habilitar el reconocimiento por voz y el análisis inteligente de compras y tickets en lenguaje natural.
+    </p>
+    <form method="post" action="/settings/gemini-api-key">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div style="margin-bottom: 0.75rem;">
+            <label class="form-label" for="api_key">Google Gemini API Key</label>
+            <input class="form-control" type="password" id="api_key" name="api_key" placeholder="AIzaSy..." autocomplete="off">
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Podés generar una clave gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color: #38bdf8; text-decoration: underline;">Google AI Studio</a>.
+            </p>
+        </div>
+        <button class="btn btn-primary settings-action" type="submit">Guardar Clave de IA</button>
+    </form>
+</div>
+<div style="margin-bottom: 1rem;">
+    <h1 style="font-size: 1.3rem; font-weight: 700;">Configuración General</h1>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">Cuentas contables, categorías, regla de cierre 30/20/50 y tope del Colchón</p>
+</div>
+
+{% if success %}
+<div class="alert alert-success">
+    {% if success == 'cuenta_creada' %}
+        Cuenta contable creada exitosamente.
+    {% elif success == 'cuenta_renombrada' %}
+        Nombre de la cuenta actualizado exitosamente.
+    {% elif success == 'categoria_creada' %}
+        Categoría creada exitosamente.
+    {% elif success == 'categoria_eliminada' %}
+        Categoría eliminada exitosamente.
+    {% elif success == 'porcentajes_actualizados' %}
+        Regla de reparto del cierre actualizada exitosamente.
+    {% elif success == 'colchon_actualizado' %}
+        Tope objetivo del Colchón actualizado exitosamente.
+    {% else %}
+        Configuración guardada correctamente.
+    {% endif %}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger">
+    {{ error }}
+</div>
+{% endif %}
+
+<!-- Cuentas Contables (RN-03) -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">🏦 Cuentas del Fondo Común (RN-03)</h2>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        Podés editar el nombre de cualquier cuenta existente o agregar una nueva.
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <form method="post" action="/settings/preferred-expense-account"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="preferred_account">Tu origen predeterminado para gastos</label><select class="form-control" id="preferred_account" name="account_id"><option value="">Sin preferencia</option>{% for acc in accounts if not acc.is_virtual and acc.currency == 'ARS' %}<option value="{{ acc.id }}" {% if preferred_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>{% endfor %}</select><button type="submit" class="btn">Guardar preferencia</button><p>Cada integrante elige su preferencia. Cada integrante puede elegir su cuenta habitual; siempre se puede cambiar al cargar.</p></form>
+        {% for acc in accounts %}
+        <div style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; background-color: rgba(255, 255, 255, 0.02);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <div>
+                    <span style="font-weight: 600;">{{ acc.name }}</span>
+                    <span class="badge badge-info" style="margin-left: 0.35rem;">
+                        {% if acc.is_virtual %}Fondo calculado{% elif acc.type == 'credit' %}Tarjeta de crédito{% elif acc.type == 'bank' %}Banco{% elif acc.type == 'wallet' %}Billetera virtual{% else %}Efectivo{% endif %}
+                    </span>
+                </div>
+                <div style="font-weight: 700; font-size: 0.95rem;">
+                    {% if acc.currency == 'USD' and not acc.is_virtual %}USD {{ acc.balance | format_decimal_ar }}{% else %}{{ acc.balance | format_currency }}{% endif %}
+                </div>
+            </div>
+            <form method="post" action="/settings/accounts/{{ acc.id }}/profile"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <label for="type_{{ acc.id }}">Tipo de {{ acc.name }}</label><select id="type_{{ acc.id }}" name="account_type" class="form-control">{% for value,label in [('bank','Banco'),('wallet','Billetera'),('cash','Efectivo'),('credit','Tarjeta de crédito')] %}<option value="{{ value }}" {% if acc.type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            <label for="owner_{{ acc.id }}">Titular</label><select id="owner_{{ acc.id }}" name="owner_user_id" class="form-control"><option value="">Sin titular individual</option>{% for person in users %}<option value="{{ person.id }}" {% if acc.owner_user_id == person.id %}selected{% endif %}>{{ person.display_name }}</option>{% endfor %}</select>
+            <label for="currency_{{ acc.id }}">Moneda</label><select id="currency_{{ acc.id }}" name="currency" class="form-control">{% for value in ['ARS','USD'] %}<option value="{{ value }}" {% if acc.currency == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select>
+            <label><input type="checkbox" name="is_virtual" value="yes" {% if acc.is_virtual %}checked{% endif %}> Fondo calculado (no es una cuenta bancaria ni admite movimientos nuevos)</label><button class="btn" type="submit">Guardar clasificación</button></form>
+            {% if acc.is_virtual %}<p>Saldo informativo calculado en pesos; no se edita ni se suma como dinero físico. Sin titular individual.</p>{% endif %}
+            {% if ownership_active and not acc.is_virtual and acc.currency == 'ARS' and acc.type != 'credit' %}
+            <details>
+                <summary>Corregir cuenta mal clasificada como tarjeta</summary>
+                <p>Para una cuenta mal clasificada sin actividad posterior a la apertura. Se conserva el historial ya incorporado a la foto. Corrige saldo a deuda; no registra un gasto nuevo. Las cuentas con actividad posterior requieren revisar su origen primero.</p>
+                <form method="post" action="/settings/accounts/{{ acc.id }}/credit-correction">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                    <input type="hidden" name="expected_version" value="{{ acc.version }}">
+                    <label for="debt_{{ acc.id }}">Deuda pendiente (importe positivo, en pesos)</label>
+                    <input id="debt_{{ acc.id }}" name="debt_amount" value="{{ acc.balance | abs | format_decimal_ar }}" inputmode="decimal" class="form-control" required>
+                    <p>El saldo pasará a ser negativo por el importe confirmado; si la deuda es cero, quedará en cero. No cambia el dinero personal ni el reparto.</p>
+                    <label for="credit_owner_{{ acc.id }}">Titular de la tarjeta</label>
+                    <select id="credit_owner_{{ acc.id }}" name="owner_user_id" class="form-control"><option value="">Sin titular individual</option>{% for person in users %}<option value="{{ person.id }}" {% if acc.owner_user_id == person.id %}selected{% endif %}>{{ person.display_name }}</option>{% endfor %}</select>
+                    <label for="credit_period_{{ acc.id }}">Período de la corrección</label>
+                    <input id="credit_period_{{ acc.id }}" name="period" type="month" value="{{ current_period }}" class="form-control" required>
+                    <label for="credit_reason_{{ acc.id }}">Motivo</label>
+                    <input id="credit_reason_{{ acc.id }}" name="reason" maxlength="500" class="form-control" required>
+                    <label><input type="checkbox" name="confirmed" value="yes" required> Confirmo la deuda pendiente y el cambio a tarjeta de crédito.</label>
+                    <button type="submit" class="btn">Corregir clasificación y deuda</button>
+                </form>
+            </details>
+            {% endif %}
+            <form method="post" action="/settings/accounts/{{ acc.id }}/rename" style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                <label for="rename_acc_{{ acc.id }}" style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">Nombre:</label>
+                <input type="text" id="rename_acc_{{ acc.id }}" name="name" value="{{ acc.name }}" required maxlength="100"
+                       class="form-control" style="min-height: 44px; padding: 0.35rem 0.6rem; font-size: 0.85rem; flex: 1;">
+                <button type="submit" class="btn btn-secondary btn-sm" style="min-height: 44px; white-space: nowrap;">
+                    Guardar nombre
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem;">+ Nueva Cuenta Contable</h3>
+        <form method="post" action="/settings/accounts">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <div class="form-group">
+                <label for="account_name" class="form-label">Nombre de la cuenta</label>
+                <input type="text" id="account_name" name="name" required maxlength="100"
+                       placeholder="Ej: Banco Compartido / Billetera Digital"
+                       class="form-control">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div class="form-group">
+                    <label for="account_type" class="form-label">Tipo</label>
+                    <select id="account_type" name="type" class="form-control">
+                        <option value="bank">Banco</option>
+                        <option value="wallet">Billetera virtual</option>
+                        <option value="cash">Efectivo</option>
+                        <option value="credit">Tarjeta de crédito (deuda)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="account_opening_balance" class="form-label">Saldo inicial (ARS)</label>
+                    <input type="text" inputmode="decimal" id="account_opening_balance" name="opening_balance" value="0,00"
+                           class="form-control">
+                </div>
+            </div>
+            <label for="account_owner">Titular</label><select id="account_owner" name="owner_user_id" class="form-control"><option value="">Sin titular individual</option>{% for person in users %}<option value="{{ person.id }}">{{ person.display_name }}</option>{% endfor %}</select>
+            <label for="account_currency">Moneda</label><select id="account_currency" name="currency" class="form-control"><option value="ARS">Pesos</option><option value="USD">Dólares (saldo nativo; altas habituales en pesos)</option></select>
+            <button type="submit" class="btn" style="width: 100%;">
+                Crear Cuenta
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Categorías de Ingresos y Gastos (RN-05, RN-41) -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">🏷️ Categorías de Movimientos (RN-05, RN-41)</h2>
+    </div>
+
+    <div style="border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem;">
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem;">+ Nueva Categoría (ej. Nafta, Tarjeta, Supermercado)</h3>
+        <form method="post" action="/settings/categories">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div class="form-group">
+                    <label for="category_name" class="form-label">Nombre de la categoría</label>
+                    <input type="text" id="category_name" name="name" required maxlength="100"
+                           placeholder="Ej: Nafta"
+                           class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="category_activity">Actividad</label><select id="category_activity" name="activity" class="form-control"><option value="household">Hogar</option><option value="business">Negocio / Emprendimiento</option><option value="personal">Personal ya repartido</option></select>
+                    <label for="category_kind" class="form-label">Tipo</label>
+                    <select id="category_kind" name="kind" class="form-control">
+                        <option value="expense">Gasto</option>
+                        <option value="income">Ingreso</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div class="form-group">
+                    <label for="category_offset" class="form-label">Imputación por defecto (RN-04)</label>
+                    <select id="category_offset" name="default_period_offset" class="form-control">
+                        <option value="0">Mes de la fecha (0)</option>
+                        <option value="1">Mes siguiente (+1, tarjeta/sueldo)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="category_charged_user" class="form-label">Cargo por defecto (RN-41)</label>
+                    <select id="category_charged_user" name="default_charged_to_user_id" class="form-control">
+                        <option value="">Común (ninguno)</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}">A cargo de {{ u.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn" style="width: 100%;">
+                Crear Categoría
+            </button>
+        </form>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 320px; overflow-y: auto;">
+        {% for cat in categories %}
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.85rem;">
+            <div style="flex: 1; min-width: 0;">
+                <span style="font-weight: 600;">{{ cat.name }}</span>
+                {% if cat.default_period_offset == 1 %}
+                <span class="badge badge-info" style="margin-left: 0.3rem;">Mes +1</span>
+                {% endif %}
+                {% if cat.default_charged_to_user_id %}
+                <span class="badge badge-user" style="margin-left: 0.3rem;">{{ users_map.get(cat.default_charged_to_user_id, 'Personal') }}</span>
+                {% endif %}
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+                <span class="badge" style="{% if cat.kind == 'income' %}background-color: var(--success-bg); color: var(--success);{% else %}background-color: var(--warning-bg); color: var(--warning);{% endif %}">
+                    {% if cat.kind == 'income' %}Ingreso{% else %}Gasto{% endif %}
+                </span>
+                <form method="post" action="/settings/categories/{{ cat.id }}/delete" class="js-confirm-submit" data-confirm="¿Desactivar la categoría '{{ cat.name }}'? Se conserva en los movimientos anteriores y deja de ofrecerse para movimientos nuevos." style="display: inline; margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                    <button type="submit" class="btn btn-danger btn-sm" style="min-height: 44px; min-width: 44px; padding: 0.2rem 0.5rem; font-size: 0.75rem;" title="Desactivar categoría" aria-label="Desactivar {{ cat.name }}">
+                        🗑️
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<section class="card">
+<h2 class="card-title">Unificar categorías</h2>
+<p>Los movimientos anteriores conservan su registro y pasan a mostrarse bajo la categoría elegida, también en el historial. Los importes y cierres no cambian. Las categorías unificadas dejan de ofrecerse para nuevas cargas.</p>
+<p>Para la casa: conservá «Varios para la casa» y marcá solamente «Cosas de la casa». «Varios» queda aparte.</p>
+<form method="post" action="/settings/categories/merge" class="js-confirm-submit" data-confirm="¿Unificar las categorías marcadas? Revisá la selección: también cambia cómo se agrupa el historial.">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}"><input type="hidden" name="expected_versions" value="{{ category_versions|tojson|forceescape }}">
+<label for="merge-target">Categoría que queda</label><select id="merge-target" name="target_id" class="form-control" required><option value="">Elegí la categoría que queda</option>{% for category in merge_categories %}<option value="{{ category.id }}" {% if merge_values.get('target_id') == category.id %}selected{% endif %}>{{ category.name }} · {{ "Ingreso" if category.kind == "income" else "Gasto" }} · {{ "Negocio / Emprendimiento" if category.activity == "business" else "Hogar" }}</option>{% endfor %}</select>
+<fieldset class="category-merge-options"><legend>Categorías que se unifican</legend>{% for category in merge_categories %}<label><input type="checkbox" name="source_ids" value="{{ category.id }}" {% if category.id in merge_values.get('source_ids', []) %}checked{% endif %}> {{ category.name }} · {{ "Ingreso" if category.kind == "income" else "Gasto" }} · {{ "Negocio / Emprendimiento" if category.activity == "business" else "Hogar" }}</label>{% endfor %}</fieldset>
+<p>Elegí primero la categoría que querés conservar y marcá los orígenes que se agruparán en ella. No marques el destino como origen. Deben tener el mismo tipo, actividad, cargo por defecto y mes de imputación. Las categorías con función técnica del sistema no se pueden unificar.</p>
+<button class="btn settings-action" type="submit">Unificar categorías seleccionadas</button>
+</form>
+</section>
+
+<!-- Regla de Reparto del Cierre (RN-23) -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">⚖️ Regla de Reparto del Cierre (RN-23)</h2>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        Los porcentajes de Ahorro + Colchón + Reparto deben sumar exactamente 100%.
+    </p>
+    <form method="post" action="/settings/close-split">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <div>
+                <label for="savings_pct" class="form-label">% Ahorro</label>
+                <input type="text" inputmode="decimal" id="savings_pct" name="savings_pct" required
+                       value="{{ split_cfg.savings_pct | format_decimal_ar }}"
+                       class="form-control">
+            </div>
+            <div>
+                <label for="buffer_pct" class="form-label">% Colchón</label>
+                <input type="text" inputmode="decimal" id="buffer_pct" name="buffer_pct" required
+                       value="{{ split_cfg.buffer_pct | format_decimal_ar }}"
+                       class="form-control">
+            </div>
+            <div>
+                <label for="distribution_pct" class="form-label">% Reparto</label>
+                <input type="text" inputmode="decimal" id="distribution_pct" name="distribution_pct" required
+                       value="{{ split_cfg.distribution_pct | format_decimal_ar }}"
+                       class="form-control">
+            </div>
+        </div>
+        <button type="submit" class="btn" style="width: 100%;">
+            Guardar Porcentajes de Cierre
+        </button>
+    </form>
+</div>
+
+<!-- Tope del Sobre Colchón (RN-22, RN-45) -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">🛡️ Tope Objetivo del Colchón (RN-22, RN-45)</h2>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+        Saldo actual del Colchón: <strong>{{ colchon_balance | format_currency }}</strong>.
+        Cuando el Colchón alcanza su tope, su porcentaje del cierre se redirige a Ahorro.
+    </p>
+    <form method="post" action="/settings/buffer-target">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+        <div class="form-group">
+            <label for="buffer_target_amount" class="form-label">Monto Objetivo en ARS (vacío = sin tope)</label>
+            <input type="text" inputmode="decimal" id="buffer_target_amount" name="target_amount"
+                   value="{% if colchon_env and colchon_env.target_amount is not none %}{{ colchon_env.target_amount | format_decimal_ar }}{% endif %}"
+                   placeholder="Ej: 1.500.000,00"
+                   class="form-control">
+        </div>
+        <button type="submit" class="btn btn-success" style="width: 100%;">
+            Guardar Tope del Colchón
+        </button>
+    </form>
+</div>
+<div class="card">
+    <div class="card-header"><h2 class="card-title">Iconos y colores de categorías</h2></div>
+    {% for category in categories %}
+    <details class="settings-appearance">
+        <summary class="settings-summary">
+            {% include "simple/_icon.html" %}
+            {{ category.name }} · {% include "_category_owner_label.html" %}
+        </summary>
+        {% include "_category_owner_form.html" %}
+        <form method="post" action="/s/settings/category/{{ category.id }}" class="settings-appearance-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}"><input type="hidden" name="return_to" value="/settings">
+            {% include "_category_icon_field.html" %}
+            <label class="form-label" for="appearance-color-{{ category.id }}">Color</label>
+            <select class="form-control" name="color" id="appearance-color-{{ category.id }}">{% for color,hex in appearance_colors.items() %}<option value="{{ color }}" {% if category.color == color %}selected{% endif %}>{{ {'blue':'Celeste','green':'Verde','amber':'Ámbar','rose':'Rosa','violet':'Violeta','teal':'Turquesa','slate':'Gris'}[color] }}</option>{% endfor %}</select>
+            <button class="btn btn-secondary settings-action" type="submit">Guardar aspecto</button>
+        </form>
+    </details>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.35rem; font-weight: 700;">🔁 Gastos e Ingresos Recurrentes</h1>
+    <form method="POST" action="/recurring/generate" style="margin: 0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="period" value="{{ period_str }}">
+        <button type="submit" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;">
+            ⚡ Generar pendientes
+        </button>
+    </form>
+</div>
+
+{% if success == 'plantilla_creada' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Plantilla recurrente creada exitosamente.
+</div>
+{% elif success == 'plantilla_actualizada' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Plantilla recurrente actualizada exitosamente.
+</div>
+{% elif success == 'pendientes_generados' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Pendientes del período generados a partir de las plantillas activas.
+</div>
+{% elif success == 'confirmado' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Movimiento confirmado y registrado en el libro contable.
+</div>
+{% elif success == 'descartado' %}
+<div class="alert alert-success" style="margin-bottom: 1rem;">
+    ✓ Movimiento descartado para este mes (sin impacto en el libro).
+</div>
+{% elif error %}
+<div class="alert alert-danger" style="margin-bottom: 1rem;">
+    ⚠️ Error: {{ error }}
+</div>
+{% endif %}
+
+<!-- SECCIÓN 1: Pendientes del Mes (RN-35) -->
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+        <h2 class="card-title">📅 Pendientes de {{ period_display }}</h2>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Nunca contabilizan solos</span>
+    </div>
+
+    {% if pendings_list %}
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for p in pendings_list %}
+        <div style="background-color: var(--input-bg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
+                <div>
+                    <div style="font-weight: 600; font-size: 0.95rem;">
+                        {{ p.template.name }}
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                        Día estimado: {{ p.template.day_of_month }} · {{ (canonical_categories|default({})).get(p.template.category_id, p.template.category).name if p.template.category else '' }}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; font-size: 1rem; color: {% if p.template.kind == 'income' %}var(--success){% else %}var(--danger){% endif %};">
+                        {{ p.template.estimated_amount | currency }}
+                    </div>
+                    <span class="badge {% if p.status == 'pending' %}badge-warning{% elif p.status == 'confirmed' %}badge-income{% else %}badge-voided{% endif %}" style="font-size: 0.75rem;">
+                        {% if p.status == 'pending' %}Pendiente{% elif p.status == 'confirmed' %}Confirmado{% else %}Descartado{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            {% if p.status == 'pending' %}
+            <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);">
+                <!-- Formulario de Confirmación en 1 Toque -->
+                <form method="POST" action="/recurring/pendings/{{ p.id }}/confirm" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted);" for="pay_date_{{ p.id }}">Fecha de pago</label>
+                        <input type="date" name="payment_date" id="pay_date_{{ p.id }}" class="form-control" style="padding: 0.35rem; font-size: 0.85rem; min-height: 44px;" value="{{ today_str }}" required>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted);" for="act_amt_{{ p.id }}">Monto real ($)</label>
+                        <input type="text" inputmode="decimal" name="actual_amount" id="act_amt_{{ p.id }}" class="form-control" style="padding: 0.35rem; font-size: 0.85rem; min-height: 44px;" value="{{ p.template.estimated_amount | decimal_ar }}">
+                    </div>
+                    <div style="grid-column: span 2; display: flex; gap: 0.5rem;">
+                        <button type="submit" class="btn btn-success" style="flex: 2; min-height: 44px; font-weight: 600; font-size: 0.85rem;">
+                            ✓ Confirmar
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Descarte en 1 Toque -->
+                <form method="POST" action="/recurring/pendings/{{ p.id }}/dismiss" style="margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-secondary js-confirm" style="width: 100%; min-height: 44px; font-size: 0.8rem; color: var(--text-muted);" data-confirm="¿Descartar este movimiento recurrente para este período?">
+                        ✕ Descartar este mes
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 1rem 0;">
+        No hay movimientos pendientes para {{ period_display }}. Hacé clic en "Generar pendientes" para crearlos a partir de tus plantillas.
+    </p>
+    {% endif %}
+</div>
+
+<!-- SECCIÓN 2: Plantillas Recurrentes (RN-35) -->
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+        <h2 class="card-title">📋 Plantillas Recurrentes</h2>
+    </div>
+
+    {% if templates_list %}
+    <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem;">
+        {% for t in templates_list %}
+        <div style="background-color: var(--input-bg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.65rem 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: 600; font-size: 0.9rem;">
+                    {{ t.name }}
+                    <span class="badge {% if t.kind == 'income' %}badge-income{% else %}badge-expense{% endif %}" style="font-size: 0.7rem; margin-left: 0.25rem;">
+                        {{ t.kind }}
+                    </span>
+                    {% if not t.active %}
+                    <span class="badge badge-voided" style="font-size: 0.7rem;">Inactiva</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                    Día {{ t.day_of_month }} · {{ (canonical_categories|default({})).get(t.category_id, t.category).name if t.category else '' }} · {{ t.account.name if t.account else '' }}
+                </div>
+            </div>
+            <div style="font-weight: 700; font-size: 0.95rem;">
+                {{ t.estimated_amount | currency }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 0.75rem 0;">
+        No hay plantillas creadas todavía.
+    </p>
+    {% endif %}
+
+    <!-- Formulario para Nueva Plantilla -->
+    <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem;">+ Nueva Plantilla Recurrente</h3>
+        <form method="POST" action="/recurring/templates">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_name" style="font-size: 0.8rem;">Nombre</label>
+                    <input type="text" name="name" id="tpl_name" class="form-control" placeholder="ej. Internet, Gimnasio" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_kind" style="font-size: 0.8rem;">Tipo</label>
+                    <select name="kind" id="tpl_kind" class="form-control" required>
+                        <option value="expense">Gasto</option>
+                        <option value="income">Ingreso</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_category" style="font-size: 0.8rem;">Categoría</label>
+                    {% include "_category_visibility.html" %}
+<select name="category_id" id="tpl_category" class="form-control" required>
+                        <option value="">Elegí una categoría</option>
+{% for cat in categories %}
+                        <option value="{{ cat.id }}" data-category-owner="{{ cat.owner_user_id or '' }}">{{ cat.name }} ({{ cat.kind }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_account" style="font-size: 0.8rem;">Cuenta habitual</label>
+                    <select name="account_id" id="tpl_account" class="form-control" required>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}">{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_day" style="font-size: 0.8rem;">Día del mes (1-31)</label>
+                    <input type="number" name="day_of_month" id="tpl_day" class="form-control" min="1" max="31" value="10" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_amount" style="font-size: 0.8rem;">Monto estimado ($)</label>
+                    <input type="text" inputmode="decimal" name="estimated_amount" id="tpl_amount" class="form-control" placeholder="ej. 15.000,00" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="tpl_charged" style="font-size: 0.8rem;">A cargo de</label>
+                    <select name="charged_to_user_id" id="tpl_charged" class="form-control">
+                        <option value="">Común</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}">{{ u.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; min-height: 44px; font-weight: 600;">
+                + Guardar Plantilla Recurrente
+            </button>
+        </form>
+    </div>
+</div>
+<script nonce="{{ csp_nonce(request) }}" src="/static/js/category_visibility.js"></script>
+{% endblock %}

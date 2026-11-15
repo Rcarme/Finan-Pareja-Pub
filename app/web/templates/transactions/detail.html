@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if tx.opening_omission %}<p role="note">Gasto que faltó en la foto inicial. Se conserva la fecha real; se cuenta en {{ tx.period.strftime("%m/%Y") }}.</p>{% endif %}
+<div style="margin-bottom: 1rem;">
+    <a href="/transactions" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">← Volver al listado</a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">{{ tx.description }}</h2>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            {% if tx.status != 'voided' %}
+            <a href="/transactions/{{ tx.id }}/edit" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.8rem; text-decoration: none;">
+                ✏ Editar
+            </a>
+            <span class="badge" style="background-color: var(--success-bg); color: var(--success);">ACTIVO</span>
+            {% else %}
+            <span class="badge badge-voided">ANULADO</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Monto Principal -->
+    <div style="font-size: 1.75rem; font-weight: 700; margin-bottom: 1.25rem; {% if tx.status == 'voided' %}text-decoration: line-through; color: var(--text-muted);{% elif tx.kind == 'income' %}color: var(--success);{% else %}color: var(--danger);{% endif %}">
+        {% if tx.kind == 'income' %}+{% else %}-{% endif %} {{ tx.amount | currency }}
+    </div>
+
+    <!-- Detalle de atributos -->
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Tipo:</span>
+            <span style="font-weight: 600; text-transform: capitalize;">
+                {% if tx.kind == 'expense' %}Gasto{% elif tx.kind == 'income' %}Ingreso{% elif tx.kind == 'transfer' %}Transferencia{% else %}Retiro{% endif %}
+            </span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Fecha:</span>
+            <span>{{ tx.date | date }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Mes de imputación (RN-18):</span>
+            <span style="font-weight: 600;">{{ tx.period.strftime('%Y-%m') }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Cuenta origen:</span>
+            <span>{{ account.name }}</span>
+        </div>
+        {% if to_account %}
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Cuenta destino:</span>
+            <span>{{ to_account.name }}</span>
+        </div>
+        {% endif %}
+        {% if category %}
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Categoría:</span>
+            <span>{{ category.name }}</span>
+        </div>
+        {% endif %}
+        {% if charged_to_user %}
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">A cargo de (RN-40):</span>
+            <span class="badge badge-user">{{ charged_to_user.display_name }}</span>
+        </div>
+        {% endif %}
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;">
+            <span style="color: var(--text-muted);">Cargado por:</span>
+            <span>{{ created_by_user.display_name if created_by_user else 'Sistema' }}</span>
+        </div>
+    </div>
+</div>
+
+{% if tx.status == 'voided' %}
+<!-- Información de anulación -->
+<div class="card" style="border-color: rgba(239, 68, 68, 0.4); background-color: rgba(239, 68, 68, 0.05);">
+    <h3 style="font-size: 1rem; color: var(--danger); margin-bottom: 0.5rem;">Registro de anulación</h3>
+    <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+        <strong>Motivo:</strong> {{ tx.void_reason }}
+    </p>
+    <p style="font-size: 0.8rem; color: var(--text-muted);">
+        Anulado el {{ tx.voided_at.strftime('%d/%m/%Y %H:%M') if tx.voided_at else '-' }} por {{ voided_by_user.display_name if voided_by_user else 'Usuario' }}.
+    </p>
+</div>
+{% else %}
+<!-- Formulario de anulación (RN-09, RN-10) -->
+<div class="card">
+    <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--danger);">Anular movimiento</h3>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Los movimientos no se eliminan. Se anulan de forma permanente y auditable (RN-09).
+    </p>
+
+    <form method="POST" action="/transactions/{{ tx.id }}/void" class="js-confirm-submit" data-confirm="¿Estás seguro de anular este movimiento? Esta acción revierte su saldo y queda auditada.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="expected_version" value="{{ tx.version }}">
+
+        <div class="form-group">
+            <label class="form-label" for="reason">Motivo de anulación (obligatorio)</label>
+            <input type="text" id="reason" name="reason" class="form-control" placeholder="Ej: Error al tipear el monto, duplicado..." required>
+        </div>
+
+        <button type="submit" class="btn btn-danger" style="width: 100%;">
+            Confirmar Anulación
+        </button>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,336 @@
+{% extends "simple/base.html" %}
+{% block content %}
+<div class="ai-header">
+    <div class="ai-badge">
+        <span class="ai-badge-dot" aria-hidden="true"></span>
+        <span>Agente IA sincronizado · {{ context_status.categories_count }} categorías y {{ context_status.accounts_count }} cuentas</span>
+    </div>
+    <h1>Asistente IA ✨</h1>
+    <p class="ai-subtitle">Pegá tickets, pedidos de compras o notas informales para registrar gastos automáticamente.</p>
+</div>
+
+{% if error %}
+<div class="alert-error" role="alert">{{ error }}</div>
+{% endif %}
+
+{% if not draft_items %}
+<section class="ai-card">
+    <p class="ai-card-desc">
+        La IA desglosa productos, calcula subtotales, asigna la categoría y cuenta correspondiente y te avisa si detecta un posible gasto duplicado antes de guardarlo.
+    </p>
+
+    <form method="post" action="/s/ai/parse" class="simple-form" id="ai-parse-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="ai-chips-wrap">
+            <span class="ai-chips-label">Ejemplos:</span>
+            <button type="button" class="ai-chip" data-example="Supermercado mensual&#10;Queso cremoso $4.500&#10;Leche x 3 $3.900&#10;Gasto común pagado con Débito">🛒 Supermercado</button>
+            <button type="button" class="ai-chip" data-example="Regalo de cumpleaños $15.000&#10;Flores y bombones $8.500&#10;Gasto común pagado con Tarjeta de crédito">🎁 Regalos varios</button>
+            <button type="button" class="ai-chip" data-example="Cafetería y merienda $4.500&#10;Fecha 08/11/2026&#10;Gasto común en efectivo">☕ Café compartido</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; margin-bottom: .35rem;">
+            <label for="raw_text" style="margin: 0; font-weight: 600;">Detalle de la compra o gastos</label>
+            <button type="button" id="ai-voice-btn" class="ai-voice-button" title="Dictar por voz" aria-label="Dictar por voz">
+                <span class="voice-icon" aria-hidden="true">🎙️</span>
+                <span class="voice-text">Dictar por voz</span>
+            </button>
+        </div>
+        <textarea id="raw_text" name="raw_text" class="ai-textarea" rows="7" required placeholder="Pegá acá el texto del comprobante, ticket o dictalo por voz con el micrófono..." autofocus>{{ raw_text }}</textarea>
+        <div id="ai-voice-status" class="ai-voice-status" style="display: none;" role="status"></div>
+
+        <button type="submit" id="ai-parse-btn" class="primary-button wide" style="margin-top: 1.25rem;" data-submitting-text="Analizando con IA ✨...">
+            Analizar con IA ✨
+        </button>
+    </form>
+</section>
+
+<aside class="help-card" style="margin-top: 1rem;">
+    <strong style="color: var(--accent); display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem;">
+        <span>💡</span> ¿Cómo funciona el asistente?
+    </strong>
+    <p style="margin: 0; font-size: .84rem; line-height: 1.5; color: #cbd5e1;">
+        Tiene memorizadas tus cuentas y categorías en caché ultra-rápida. Desglosa compras compuestas, asigna responsables, respeta fechas y verifica si ya existe un gasto con el mismo importe y día en tu contabilidad.
+    </p>
+</aside>
+
+{% else %}
+
+<section>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem;">
+        <div>
+            <h2 style="font-size: 1.25rem; margin: 0;">Revisá los movimientos</h2>
+            <span class="muted" style="font-size: .85rem;">Verificá los importes y datos antes de ingresarlos.</span>
+        </div>
+        <a href="/s/ai" class="secondary-button" style="text-decoration: none; font-size: .85rem; padding: .4rem .85rem;">Empezar de nuevo</a>
+    </div>
+
+    <div class="ai-review-bar">
+        <div class="ai-review-stat">
+            <span class="stat-label">Movimientos</span>
+            <strong id="ai-count-display">{{ draft_items|length }} seleccionados</strong>
+        </div>
+        <div class="ai-review-stat" style="text-align: right;">
+            <span class="stat-label">Total a ingresar</span>
+            <strong class="stat-total" id="ai-total-display">$ 0,00</strong>
+        </div>
+    </div>
+
+    <form method="post" action="/s/ai/confirm" class="simple-form" id="ai-confirm-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+        <input type="hidden" name="item_count" value="{{ draft_items|length }}">
+
+        {% for item in draft_items %}
+        <div class="ai-item-card {% if item.duplicate_warning %}is-duplicate-warning is-excluded{% endif %}" id="card_{{ item.index }}">
+            <div class="ai-item-header">
+                <label class="ai-checkbox-label" for="include_{{ item.index }}">
+                    <input type="checkbox" id="include_{{ item.index }}" name="include_{{ item.index }}" value="1" {% if not item.duplicate_warning %}checked{% endif %} data-card-id="card_{{ item.index }}" data-amount-input="amount_{{ item.index }}">
+                    <span>Ítem {{ item.index + 1 }}</span>
+                </label>
+                {% if item.notes %}
+                <span class="muted" style="font-size: .82rem; background: rgba(255,255,255,0.06); padding: .2rem .5rem; border-radius: .4rem;">{{ item.notes }}</span>
+                {% endif %}
+            </div>
+
+            {% if item.duplicate_warning %}
+            <div class="ai-duplicate-alert" role="alert">
+                <span class="alert-icon" aria-hidden="true">⚠️</span>
+                <div>
+                    <strong>Atención: posible gasto duplicado</strong>
+                    <p>{{ item.duplicate_warning }}</p>
+                    <small>Se desmarcó automáticamente por precaución. Tildá la casilla de arriba si realmente deseás registrarlo.</small>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="ai-item-grid">
+                <div>
+                    <label for="description_{{ item.index }}">Concepto</label>
+                    <input id="description_{{ item.index }}" name="description_{{ item.index }}" required value="{{ item.description }}">
+                </div>
+
+                <div>
+                    <label for="amount_{{ item.index }}">Importe ($)</label>
+                    <input id="amount_{{ item.index }}" name="amount_{{ item.index }}" class="amount-input" inputmode="decimal" required value="{{ item.amount }}">
+                </div>
+            </div>
+
+            <div class="ai-meta-grid" style="margin-top: .6rem;">
+                <div>
+                    <label for="category_id_{{ item.index }}">Categoría</label>
+                    <select id="category_id_{{ item.index }}" name="category_id_{{ item.index }}" required>
+                        {% for cat in all_categories %}
+                        <option value="{{ cat.id }}" {% if cat.id == item.category_id %}selected{% endif %}>{{ category_label(cat.name) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="account_id_{{ item.index }}">Cuenta / Tarjeta</label>
+                    <select id="account_id_{{ item.index }}" name="account_id_{{ item.index }}" required>
+                        {% for acc in available_accounts %}
+                        <option value="{{ acc.id }}" {% if acc.id == item.account_id %}selected{% endif %}>{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="ai-meta-grid" style="margin-top: .6rem;">
+                <div>
+                    <label for="activity_{{ item.index }}">Actividad</label>
+                    <select id="activity_{{ item.index }}" name="activity_{{ item.index }}">
+                        <option value="household" {% if item.activity == 'household' %}selected{% endif %}>Hogar</option>
+                        <option value="business" {% if item.activity == 'business' %}selected{% endif %}>Negocio / Emprendimiento</option>
+                        <option value="personal" {% if item.activity == 'personal' %}selected{% endif %}>Dinero personal ya repartido</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="charged_to_user_id_{{ item.index }}">A cargo de</label>
+                    <select id="charged_to_user_id_{{ item.index }}" name="charged_to_user_id_{{ item.index }}">
+                        <option value="" {% if not item.charged_to_user_id %}selected{% endif %}>Común / Hogar</option>
+                        {% for person in users %}
+                        <option value="{{ person.id }}" {% if item.charged_to_user_id == person.id %}selected{% endif %}>{{ person.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="ai-meta-grid" style="margin-top: .6rem;">
+                <div>
+                    <label for="tx_date_{{ item.index }}">Fecha del gasto</label>
+                    <input id="tx_date_{{ item.index }}" name="tx_date_{{ item.index }}" type="date" required value="{{ item.tx_date }}">
+                </div>
+                <div>
+                    <label for="notes_{{ item.index }}">Notas adicionales</label>
+                    <input id="notes_{{ item.index }}" name="notes_{{ item.index }}" value="{{ item.notes }}" placeholder="Opcional">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <button type="submit" id="ai-confirm-btn" class="primary-button wide" style="margin-top: 1rem;" data-submitting-text="Confirmando movimientos...">
+            Confirmar e ingresar movimientos
+        </button>
+    </form>
+</section>
+{% endif %}
+
+<script nonce="{{ csp_nonce(request) }}">
+document.addEventListener('DOMContentLoaded', function() {
+    // Dictado por voz con Web Speech API
+    var voiceBtn = document.getElementById('ai-voice-btn');
+    var voiceStatus = document.getElementById('ai-voice-status');
+    var rawText = document.getElementById('raw_text');
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (voiceBtn && rawText) {
+        if (!SpeechRecognition) {
+            voiceBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (voiceStatus) {
+                    voiceStatus.textContent = 'ℹ️ Tu navegador no soporta dictado directo. Podés usar el botón de micrófono del teclado de tu teléfono.';
+                    voiceStatus.style.display = 'block';
+                }
+            });
+        } else {
+            var recognition = new SpeechRecognition();
+            recognition.lang = 'es-AR';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            var isListening = false;
+            var initialTextBeforeSpeech = '';
+
+            voiceBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (isListening) {
+                    recognition.stop();
+                    return;
+                }
+                try {
+                    initialTextBeforeSpeech = rawText.value;
+                    recognition.start();
+                } catch (err) {
+                    console.error('Error al iniciar reconocimiento de voz:', err);
+                }
+            });
+
+            recognition.onstart = function() {
+                isListening = true;
+                voiceBtn.classList.add('is-listening');
+                var textSpan = voiceBtn.querySelector('.voice-text');
+                if (textSpan) textSpan.textContent = 'Escuchando...';
+                if (voiceStatus) {
+                    voiceStatus.textContent = '🎙️ Escuchando... Dictá tus compras o gastos. Tocá de nuevo para parar.';
+                    voiceStatus.style.display = 'block';
+                }
+            };
+
+            recognition.onresult = function(event) {
+                var interimTranscript = '';
+                var finalTranscript = '';
+                for (var i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                var speechPiece = finalTranscript || interimTranscript;
+                if (speechPiece) {
+                    var separator = initialTextBeforeSpeech.length > 0 && !initialTextBeforeSpeech.endsWith('\n') && !initialTextBeforeSpeech.endsWith(' ') ? '\n' : '';
+                    rawText.value = initialTextBeforeSpeech + separator + speechPiece;
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.warn('Speech recognition error:', event.error);
+                if (voiceStatus) {
+                    if (event.error === 'not-allowed') {
+                        voiceStatus.textContent = '⚠️ Permiso de micrófono no habilitado en el navegador.';
+                    } else if (event.error !== 'no-speech') {
+                        voiceStatus.textContent = '⚠️ Error en reconocimiento: ' + event.error;
+                    }
+                }
+            };
+
+            recognition.onend = function() {
+                isListening = false;
+                voiceBtn.classList.remove('is-listening');
+                var textSpan = voiceBtn.querySelector('.voice-text');
+                if (textSpan) textSpan.textContent = 'Dictar por voz';
+                if (voiceStatus && (!voiceStatus.textContent.startsWith('⚠️'))) {
+                    voiceStatus.style.display = 'none';
+                }
+            };
+        }
+    }
+
+    // Quick example chips
+    document.querySelectorAll('.ai-chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+            var txt = document.getElementById('raw_text');
+            if (txt) {
+                txt.value = this.getAttribute('data-example');
+                txt.focus();
+            }
+        });
+    });
+
+    // Total and selection recalculation
+    function recalculateTotal() {
+        var checkboxes = document.querySelectorAll('input[data-card-id]');
+        if (!checkboxes.length) return;
+        var total = 0;
+        var count = 0;
+        checkboxes.forEach(function(cb) {
+            var card = document.getElementById(cb.getAttribute('data-card-id'));
+            if (card) {
+                card.classList.toggle('is-excluded', !cb.checked);
+            }
+            if (cb.checked) {
+                count++;
+                var amtInput = document.getElementById(cb.getAttribute('data-amount-input'));
+                if (amtInput) {
+                    var val = parseFloat(amtInput.value.replace(',', '.')) || 0;
+                    total += val;
+                }
+            }
+        });
+        var countEl = document.getElementById('ai-count-display');
+        var totalEl = document.getElementById('ai-total-display');
+        var btnEl = document.getElementById('ai-confirm-btn');
+        if (countEl) countEl.textContent = count + ' seleccionado' + (count === 1 ? '' : 's');
+        if (totalEl) {
+            var parts = total.toFixed(2).split('.');
+            var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            totalEl.textContent = '$ ' + intPart + ',' + parts[1];
+        }
+        if (btnEl) {
+            btnEl.disabled = count === 0;
+            if (count === 0) {
+                btnEl.textContent = 'Seleccioná al menos un movimiento';
+            } else {
+                btnEl.textContent = 'Confirmar e ingresar ' + count + ' movimiento' + (count === 1 ? '' : 's');
+            }
+        }
+    }
+
+    document.addEventListener('change', function(e) {
+        if (e.target && (e.target.matches('input[data-card-id]') || e.target.classList.contains('amount-input'))) {
+            recalculateTotal();
+        }
+    });
+
+    document.addEventListener('input', function(e) {
+        if (e.target && e.target.classList.contains('amount-input')) {
+            recalculateTotal();
+        }
+    });
+
+    recalculateTotal();
+});
+</script>
+{% endblock %}

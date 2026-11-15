@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <a href="/transactions/{{ tx.id }}" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">← Volver al detalle</a>
+</div>
+
+{% if is_conflict %}
+<div class="alert alert-danger" style="border: 2px solid var(--danger); background-color: rgba(239, 68, 68, 0.15);">
+    <strong>Conflicto de concurrencia (409):</strong> {{ error }}
+    <div style="margin-top: 0.5rem;">
+        <a href="/transactions/{{ tx.id }}/edit" class="btn btn-secondary" style="display: inline-block; padding: 0.35rem 0.75rem; font-size: 0.85rem;">
+            ↻ Recargar versión actual
+        </a>
+    </div>
+</div>
+{% elif error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if is_locked %}
+<div class="alert alert-info" style="border-left: 4px solid var(--primary); background-color: rgba(59, 130, 246, 0.1);">
+    <strong>Movimiento enlazado a sobre o vencimiento:</strong>
+    El monto, moneda extranjera y período contable son inmutables para preservar la consistencia. Si necesitás modificarlos, debés anular este movimiento y cargarlo nuevamente (RN-10, RN-28).
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Editar Movimiento #{{ tx.id }}</h2>
+        <span class="badge" style="background-color: var(--input-bg); color: var(--text-muted);">Versión {{ tx.version }}</span>
+    </div>
+
+    <form method="POST" action="/transactions/{{ tx.id }}/edit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="expected_version" value="{{ form_expected_version | default(tx.version) }}">
+
+        <!-- Monto -->
+        <div class="form-group">
+            <label for="activity">Actividad</label>
+            <select id="activity" name="activity" class="form-control">
+                {% for value, label in [('household','Hogar'),('business','Negocio / Emprendimiento'),('personal','Dinero personal ya repartido')] %}
+                <option value="{{ value }}" {% if form_activity | default(tx.activity) == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <p>La actividad y a quién corresponde el gasto son independientes de la tarjeta o cuenta de origen.</p>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="amount">Monto ($)</label>
+            {% if is_locked %}
+            <input
+                type="text"
+                id="amount_display"
+                class="form-control"
+                value="{{ tx.amount | currency }}"
+                readonly
+                disabled
+                style="font-size: 1.5rem; font-weight: 700; text-align: right; background-color: var(--input-bg); opacity: 0.7;"
+            >
+            <input type="hidden" name="amount" value="{{ tx.amount | decimal_ar }}">
+            {% else %}
+            <input
+                type="text"
+                id="amount"
+                name="amount"
+                inputmode="decimal"
+                required
+                class="form-control"
+                style="font-size: 1.5rem; font-weight: 700; text-align: right; padding: 0.75rem 1rem;"
+                value="{{ form_amount | default(tx.amount | decimal_ar) }}"
+            >
+            {% endif %}
+        </div>
+
+        <!-- Tipo y Cuentas -->
+        {% if has_future_installments and not is_locked %}
+        <div class="form-group">
+            <label class="form-label" for="future_installments_update">¿Actualizar las cuotas restantes?</label>
+            <p class="text-muted">La corrección cambia este movimiento. Elegí si también cambia la estimación de las cuotas futuras; no modifica pagos ya registrados.</p>
+            <select id="future_installments_update" name="future_installments_update" class="form-control">
+                <option value="">Elegir para esta corrección...</option>
+                <option value="no" {% if form_future_installments_update == "no" %}selected{% endif %}>No, conservar las estimaciones</option>
+                <option value="yes" {% if form_future_installments_update == "yes" %}selected{% endif %}>Sí, usar el importe corregido</option>
+            </select>
+        </div>
+        {% endif %}
+
+        <input type="hidden" name="kind" value="{{ tx.kind }}">
+
+        <div class="form-group">
+            <label class="form-label" for="account_id">Cuenta</label>
+            {% if is_locked %}
+            <select id="account_id_display" class="form-control" disabled style="opacity: 0.7;">
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if acc.id == form_account_id | default(tx.account_id) %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="account_id" value="{{ tx.account_id }}">
+            {% else %}
+            <select id="account_id" name="account_id" class="form-control" required>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if acc.id == form_account_id | default(tx.account_id) %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </div>
+
+        {% if tx.kind == 'transfer' %}
+        <div class="form-group">
+            <label class="form-label" for="to_account_id">Cuenta Destino</label>
+            <select id="to_account_id" name="to_account_id" class="form-control">
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if acc.id == form_to_account_id | default(tx.to_account_id) %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Descripción -->
+        <div class="form-group">
+            <label class="form-label" for="description">Descripción</label>
+            <input
+                type="text"
+                id="description"
+                name="description"
+                class="form-control"
+                value="{{ form_description | default(tx.description) }}"
+                required
+            >
+        </div>
+
+        <!-- Categoría -->
+        {% if tx.kind != 'transfer' %}
+        <div class="form-group">
+            {% include "_category_visibility.html" %}
+            <label class="form-label" for="category_id">Categoría (RN-05)</label>
+            <select id="category_id" name="category_id" class="form-control" required>
+                <option value="">Seleccionar categoría...</option>
+                {% for cat in categories %}
+                <option data-category-owner="{{ cat.owner_user_id or '' }}" data-activity="{{ cat.activity }}" data-kind="{{ cat.kind }}" value="{{ cat.id }}" {% if cat.id == form_category_id | default(tx.category_id) %}selected{% endif %}>
+                    {{ cat.name }} ({{ 'Gasto' if cat.kind == 'expense' else 'Ingreso' }}){% if not cat.active %} — inactiva, conservada en este movimiento{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Cargo personal -->
+        <div class="form-group">
+            <label class="form-label" for="charged_to_user_id">A cargo de (RN-40)</label>
+            <select id="charged_to_user_id" name="charged_to_user_id" class="form-control">
+                <option value="">Común (Fondo de ambos)</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if u.id == form_charged_to_user_id | default(tx.charged_to_user_id) %}selected{% endif %}>
+                    {{ u.display_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <!-- Fechas y Período -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+                <label class="form-label" for="tx_date">Fecha del movimiento</label>
+                <input
+                    type="date"
+                    id="tx_date"
+                    name="tx_date"
+                    class="form-control"
+                    value="{{ form_date | default(tx.date.isoformat()) }}"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="period">Mes de imputación</label>
+                {% if is_locked %}
+                <input
+                    type="month"
+                    id="period_display"
+                    class="form-control"
+                    value="{{ form_period | default(tx.period.strftime('%Y-%m')) }}"
+                    readonly
+                    disabled
+                    style="opacity: 0.7;"
+                >
+                <input type="hidden" name="period" value="{{ form_period | default(tx.period.strftime('%Y-%m')) }}">
+                {% else %}
+                <input
+                    type="month"
+                    id="period"
+                    name="period"
+                    class="form-control"
+                    value="{{ form_period | default(tx.period.strftime('%Y-%m')) }}"
+                    required
+                >
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+            <a href="/transactions/{{ tx.id }}" class="btn btn-secondary" style="flex: 1; text-align: center; text-decoration: none;">
+                Cancelar
+            </a>
+            <button type="submit" {% if is_conflict %}disabled{% endif %} class="btn btn-primary" style="flex: 2;">
+                Guardar Cambios
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

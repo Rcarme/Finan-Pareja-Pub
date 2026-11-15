@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style nonce="{{ csp_nonce(request) }}">
+    .snapshot-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+    .snapshot-table td {
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.9rem;
+    }
+    .snapshot-table tr:last-child td {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+            <span class="badge {% if period.status == 'closed' %}badge-success{% else %}badge-info{% endif %}" style="margin-bottom: 0.35rem;">
+                {{ "Cerrado" if period.status == "closed" else "Abierto" }}
+            </span>
+            <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-color);">
+                Período {{ period.period.strftime('%Y-%m') }}
+            </h2>
+        </div>
+        <a href="/close/history" class="btn btn-outline btn-sm">Historial</a>
+    </div>
+
+    {% if snapshot %}
+    <h3 style="font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.5rem;">
+        📸 Snapshot inmutable del cierre (RN-24)
+    </h3>
+    <div style="background-color: rgba(30, 41, 59, 0.5); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.25rem;">
+        <table class="snapshot-table">
+            <tr>
+                <td style="color: var(--text-muted);">Disponible acumulado (D)</td>
+                <td style="text-align: right; font-weight: 700;">{{ snapshot.available | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Reserva de refuerzos (R)</td>
+                <td style="text-align: right; font-weight: 700; color: var(--warning);">- {{ snapshot.reinforcement_reservation | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Base de reparto</td>
+                <td style="text-align: right; font-weight: 700;">{{ snapshot.base | currency }}</td>
+            </tr>
+            <tr style="background-color: rgba(56, 189, 248, 0.05);">
+                <td><strong>Excedente aplicado (E)</strong></td>
+                <td style="text-align: right; font-weight: 800; color: var(--primary);">{{ snapshot.excedent | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Aporte al Colchón{% if snapshot.split_config %} ({{ snapshot.split_config.colchon }}%){% endif %}</td>
+                <td style="text-align: right; font-weight: 700;">{{ snapshot.buffer_allocation | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Aporte Ahorro común{% if snapshot.split_config %} ({{ snapshot.split_config.ahorro }}%){% endif %}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--success);">{{ snapshot.savings_allocation | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Total retiros{% if snapshot.split_config %} ({{ snapshot.split_config.repartir }}%){% endif %}</td>
+                <td style="text-align: right; font-weight: 700;">{{ snapshot.distributable | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Retenido en el fondo</td>
+                <td style="text-align: right; font-weight: 600; color: var(--text-muted);">{{ snapshot.retained | currency }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Cerrado por: <strong>{{ users_map.get(period.closed_by, "Sistema") }}</strong> el {{ period.closed_at | date if period.closed_at else "Fecha desconocida" }}.
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+        No hay datos de snapshot para este período.
+    </p>
+    {% endif %}
+
+    {% if can_reopen %}
+    <div style="background-color: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.5rem; padding: 1rem; margin-top: 1.5rem;">
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--danger); margin-bottom: 0.5rem;">
+            ⚠️ Reapertura formal del período (RN-25)
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Al reabrir el período se anularán los retiros y asignaciones creados por el cierre, devolviendo los fondos y permitiendo volver a editar o cargar movimientos.
+        </p>
+
+        <form method="post" action="/close/{{ period.period.strftime('%Y-%m-%d') }}/reopen" class="js-confirm-submit" data-confirm="¿Reabrir {{ period.period.strftime('%Y-%m') }}? Se anularán los retiros y asignaciones del cierre y quedará disponible para editar.">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label class="form-label" for="reason">Motivo de reapertura (obligatorio):</label>
+                <input 
+                    type="text" 
+                    id="reason" 
+                    name="reason" 
+                    class="form-control" 
+                    placeholder="Ej. Omisión de factura de luz..." 
+                    required
+                >
+            </div>
+            <button type="submit" class="btn btn-danger" style="width: 100%; min-height: 44px; font-weight: 700;">
+                🔓 Reabrir período
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Tarjetas de Fondo y Disponible -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+    <div class="card" style="margin-bottom: 0; padding: 1rem;">
+        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Fondo Común</span>
+        <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); margin-top: 0.25rem;">
+            {{ total_fund | currency }}
+        </div>
+    </div>
+    <div class="card" style="margin-bottom: 0; padding: 1rem; {% if available_fund < 0 %}border-color: var(--danger); background-color: rgba(239, 68, 68, 0.08);{% endif %}">
+        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Disponible</span>
+        <div style="font-size: 1.35rem; font-weight: 700; {% if available_fund < 0 %}color: var(--danger);{% else %}color: var(--success);{% endif %} margin-top: 0.25rem;">
+            {{ available_fund | currency }}
+        </div>
+    </div>
+</div>
+
+{% if available_fund < 0 %}
+<div class="alert alert-danger" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+    <span>⚠️</span>
+    <div>
+        <strong>Disponible negativo:</strong> Las obligaciones y asignaciones superan el disponible del hogar. Revisá deudas, reservas y saldos; no implica necesariamente que una cuenta bancaria esté en negativo.
+    </div>
+</div>
+{% endif %}
+
+<!-- Banner de Alerta de Backups (ARCHITECTURE.md §6) -->
+<p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+    El fondo del hogar excluye el dinero personal cuando la apertura está aplicada e incluye las deudas de tarjetas. Los sobres reservan
+    parte de ese fondo. El disponible es el fondo menos esas reservas; no es otra cuenta.
+</p>
+{% if backup_health and not backup_health.is_fresh and backup_health.alert_message %}
+<div class="alert alert-danger" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.2rem;">💾</span>
+        <div>
+            <strong>Alerta de Backup:</strong> {{ backup_health.alert_message }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Banners de Alquiler y Recurrentes (RN-33, RN-34, RN-35) -->
+{% if rent_summary and rent_summary.has_adjust_reminder %}
+<div class="alert {% if rent_summary.adjust_alert_status == 'overdue' %}alert-danger{% else %}alert-warning{% endif %}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.2rem;">🏠</span>
+        <div>
+            {% if rent_summary.adjust_alert_status == 'overdue' %}
+                <strong>Ajuste de alquiler vencido:</strong> Debió ajustarse el {{ rent_summary.contract.next_adjust_date | date }}.
+            {% else %}
+                <strong>Próximo ajuste de alquiler:</strong> Programado para el {{ rent_summary.contract.next_adjust_date | date }}.
+            {% endif %}
+        </div>
+    </div>
+    <a href="/rent" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.25rem 0.5rem; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center;">Cargar ajuste →</a>
+</div>
+{% endif %}
+
+{% if rent_summary and rent_summary.has_missing_collection_alert %}
+<div class="alert alert-danger" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.2rem;">⚠️</span>
+        <div>
+            <strong>Cobro de alquiler faltante:</strong> Pasado el día 5 sin cobro registrado para este mes.
+        </div>
+    </div>
+    <a href="/rent" class="btn btn-success" style="font-size: 0.8rem; padding: 0.25rem 0.5rem; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center;">Cobrar →</a>
+</div>
+{% endif %}
+
+{% if unresolved_recurrings %}
+<div class="alert alert-warning" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.2rem;">🔁</span>
+        <div>
+            <strong>Recurrentes pendientes:</strong> Hay {{ pending_recurrings_count }} movimientos del mes por confirmar o descartar.
+        </div>
+    </div>
+    <a href="/recurring" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.25rem 0.5rem; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center;">Revisar →</a>
+</div>
+{% endif %}
+
+<!-- Botones de Acción Rápida (≥ 44px) -->
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1.25rem;">
+    <a href="/transactions/new?kind=expense" class="btn btn-danger" style="flex-direction: column; padding: 0.5rem; gap: 0.2rem;">
+        <span style="font-size: 1.1rem; line-height: 1;">💸</span>
+        <span style="font-size: 0.85rem;">+ Gasto</span>
+    </a>
+    <a href="/transactions/new?kind=income" class="btn btn-success" style="flex-direction: column; padding: 0.5rem; gap: 0.2rem;">
+        <span style="font-size: 1.1rem; line-height: 1;">💵</span>
+        <span style="font-size: 0.85rem;">+ Ingreso</span>
+    </a>
+    <a href="/transactions/new?kind=transfer" class="btn btn-secondary" style="flex-direction: column; padding: 0.5rem; gap: 0.2rem;">
+        <span style="font-size: 1.1rem; line-height: 1;">🔄</span>
+        <span style="font-size: 0.85rem;">Transferir</span>
+    </a>
+</div>
+
+<!-- Próximo Vencimiento Departamento & Provisión (RN-27, RN-30) -->
+{% if next_obligation or provision_suggestion %}
+<div class="card" style="border-left: 4px solid var(--primary); padding: 1rem; margin-bottom: 1rem;">
+    <div class="card-header" style="margin-bottom: 0.5rem;">
+        <h2 class="card-title" style="font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span>🏢</span> Departamento
+        </h2>
+        <a href="/obligations" style="color: var(--primary); text-decoration: none; font-size: 0.8rem; font-weight: 600;">Ver cronograma →</a>
+    </div>
+
+    {% if next_obligation %}
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; {% if provision_suggestion and provision_suggestion.monthly_suggested > 0 %}border-bottom: 1px dashed var(--border); margin-bottom: 0.5rem;{% endif %}">
+        <div>
+            <div style="font-weight: 600; font-size: 0.95rem;">
+                Próximo: {{ next_obligation.due_period.strftime("%B %Y") | capitalize }}
+                {% if next_obligation.kind == 'refuerzo' %}
+                <span class="badge badge-user" style="background-color: rgba(168, 85, 247, 0.2); color: #c084fc;">Refuerzo</span>
+                {% else %}
+                <span class="badge badge-info">Cuota</span>
+                {% endif %}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                USD {{ next_obligation.usd_amount | decimal_ar }}
+            </div>
+        </div>
+        <a href="/obligations/{{ next_obligation.id }}/pay" class="btn btn-primary btn-sm" style="min-height: 44px; padding: 0 0.8rem; display: inline-flex; align-items: center;">
+            Pagar
+        </a>
+    </div>
+    {% endif %}
+
+    {% if provision_suggestion and provision_suggestion.monthly_suggested > 0 %}
+    <div style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <span style="color: var(--text-muted);">Sugerencia refuerzo ({{ provision_suggestion.cierres_restantes }} meses):</span>
+            <div style="font-weight: 700; color: var(--success); font-size: 0.95rem;">
+                {{ provision_suggestion.monthly_suggested | currency }} / mes
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Saldos por Cuenta -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Dinero por ubicación</h2>
+        <a href="/reconciliation" class="btn btn-outline btn-sm">Conciliar</a>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for acc in accounts if acc.type != "credit" and not acc.is_virtual %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; {% if not loop.last %}border-bottom: 1px solid var(--border);{% endif %}">
+            <div>
+                <div class="account-name" style="font-weight: 600;">{{ acc.name }}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: capitalize;">
+                    {% if acc.type == 'bank' %}Banco{% elif acc.type == 'cash' %}Efectivo{% else %}Billetera virtual{% endif %}
+                </div>
+            </div>
+            <div style="font-weight: 700; font-size: 1.05rem;">
+                {% if acc.currency == "USD" %}USD {{ acc.balance | decimal_ar }}{% else %}{{ acc.balance | currency }}{% endif %}{% if acc.estimated %} · estimado{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<section class="card"><h2>Deuda de tarjetas</h2>
+{% for acc in accounts if acc.type == 'credit' and not acc.is_virtual %}
+<p><strong>{{ acc.name }}</strong>: {% if acc.currency == 'USD' %}USD {{ (-acc.balance) | decimal_ar }}{% else %}{{ (-acc.balance) | currency }}{% endif %}</p>
+{% else %}<p>No hay tarjetas configuradas.</p>{% endfor %}
+<p>{% if ownership and ownership.debt_usd_by_account %}{% for account_id, amount in ownership.debt_usd_by_account.items() %}<p>{{ accounts_map.get(account_id, "Tarjeta") }} · deuda adicional: USD {{ amount | decimal_ar }}</p>{% endfor %}{% endif %}
+La deuda no es dinero disponible. Las cuotas futuras se consultan en Proyección.</p></section>
+{% if ownership %}
+<section class="card"><h2>Dinero personal</h2>{% for uid, amount in ownership.personal_by_user.items() %}<p>{{ users_map.get(uid, 'Integrante') }}: {{ amount | currency }}</p>{% endfor %}<p>La asignación personal es independiente del saldo de MP o efectivo.</p></section>
+<section class="card"><h2>Reservas del hogar</h2><p>Ahorro común: {{ current_savings_ars | currency }} y USD {{ ownership.savings_usd | decimal_ar }}</p><p>El ahorro inicial está reservado para reparar el auto y no vuelve a repartirse. El saldo en pesos incluye los movimientos posteriores del sobre Ahorro común.</p></section>
+{% else %}<section class="card"><h2>Apertura pendiente</h2><p>Los saldos personales y reservas todavía no están separados. Revisá la apertura antes de interpretar el fondo como dinero del hogar.</p><a href="/settings/ownership">Revisar apertura</a></section>{% endif %}
+<!-- Últimos Movimientos -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Últimos movimientos</h2>
+        <a href="/transactions" style="color: var(--primary); text-decoration: none; font-size: 0.85rem;">Ver todos</a>
+    </div>
+
+    {% if recent_transactions %}
+    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+        {% for tx in recent_transactions %}
+        <a href="/transactions/{{ tx.id }}" style="text-decoration: none; color: inherit; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.6rem 0.5rem; border-radius: 0.5rem; background-color: rgba(255, 255, 255, 0.02); {% if tx.status == 'voided' %}opacity: 0.6;{% endif %}">
+            <div style="display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <span style="font-weight: 600; font-size: 0.92rem; overflow-wrap: anywhere;">{{ tx.description }}</span>
+                    {% if tx.status == 'voided' %}
+                    <span class="badge badge-voided">Anulado</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                    <span>{{ tx.date | date }}</span>
+                    <span>•</span>
+                    <span>{{ tx.account_name }}</span>
+                    {% if tx.category_name %}
+                    <span>•</span>
+                    <span>{{ tx.category_name }}</span>
+                    {% endif %}
+                    {% if tx.charged_to_name %}
+                    <span class="badge badge-user">A cargo de {{ tx.charged_to_name }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="font-weight: 700; font-size: 0.92rem; text-align: right; flex-shrink: 0; white-space: nowrap; {% if tx.status == 'voided' %}text-decoration: line-through; color: var(--text-muted);{% elif tx.kind == 'income' %}color: var(--success);{% else %}color: var(--danger);{% endif %}">
+                {% if tx.kind == 'income' %}+{% else %}-{% endif %} {{ tx.amount | currency }}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 1.5rem 0;">
+        No hay movimientos registrados en este período.
+    </p>
+    {% endif %}
+</div>
+{% endblock %}

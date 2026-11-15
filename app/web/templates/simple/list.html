@@ -1,0 +1,91 @@
+{% extends "simple/base.html" %}
+{% block content %}
+<h1>Operaciones</h1>
+{% if category_id and category_id in categories %}<p class="informative-note">Filtrando por categoría: <strong>{{ category_label(categories[category_id].name) }}</strong></p>{% endif %}
+{% if account_id and account_id in accounts %}<p class="informative-note">Filtrando por cuenta: <strong>{{ accounts[account_id].name }}</strong></p>{% endif %}
+{% if request.query_params.get('ai_count') %}<div class="success-card" role="status"><strong>✨ Se ingresaron {{ request.query_params.get('ai_count') }} movimientos con IA exitosamente.</strong></div>{% endif %}
+{% if saved_tx and not request.query_params.get('ai_count') %}<div class="success-card" role="status"><strong>Operación guardada</strong>{% if undo_remaining > 0 %}<form method="post" action="/s/{{ saved_tx.id }}/undo" data-undo-seconds="{{ undo_remaining }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}"><input type="hidden" name="expected_version" value="{{ saved_tx.version }}"><button type="submit" class="secondary-button">Deshacer <span data-undo-countdown>{{ undo_remaining }}</span> s</button></form>{% endif %}</div>{% endif %}
+
+<form method="get" class="list-filters" style="margin-bottom: 1.25rem;">
+    {% if scope %}<input type="hidden" name="scope" value="{{ scope }}">{% endif %}
+    
+    <div class="filter-group full-width">
+        <label for="q">Buscar por concepto o comercio</label>
+        <input id="q" type="search" name="q" value="{{ q }}" placeholder="Ej: Supermercado, Combustible, Farmacia...">
+    </div>
+
+    <div class="filter-group">
+        <label for="category_id">Categoría</label>
+        <select id="category_id" name="category_id">
+            <option value="">Todas las categorías</option>
+            {% for cat in available_categories %}
+            <option value="{{ cat.id }}" {% if category_id == cat.id %}selected{% endif %}>{{ category_label(cat.name) }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="account_id">Cuenta / Medio de pago</label>
+        <select id="account_id" name="account_id">
+            <option value="">Todas las cuentas</option>
+            {% for acc in available_accounts %}
+            <option value="{{ acc.id }}" {% if account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="window">Período</label>
+        <select id="window" name="window">
+            {% for value,label in [('month','Este mes'),('week','Esta semana'),('day','Hoy'),('year','Este año')] %}
+            <option value="{{ value }}" {% if window == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label for="kind">Tipo</label>
+        <select id="kind" name="kind">
+            <option value="">Todos</option>
+            <option value="expense" {% if kind == 'expense' %}selected{% endif %}>Gastos</option>
+            <option value="income" {% if kind == 'income' %}selected{% endif %}>Ingresos</option>
+        </select>
+    </div>
+
+    <div class="filter-group full-width">
+        <label for="as_of">Fecha de referencia (período)</label>
+        <input id="as_of" type="date" name="as_of" value="{{ as_of }}">
+    </div>
+
+    <div class="filter-actions full-width">
+        <button type="submit" class="secondary-button wide">Buscar y Filtrar</button>
+        {% if q or category_id or account_id or kind or as_of != today or window != 'month' %}
+        <a href="/s/list" class="text-link" style="text-align: center; font-size: .85rem; margin-top: .2rem;">✕ Limpiar filtros</a>
+        {% endif %}
+    </div>
+</form>
+
+<section class="simple-card">
+    {% for date, daily in transactions|groupby('date')|reverse %}
+    <h2 class="day-heading">{{ date|date }}</h2>
+    {% with transactions=daily %}{% include "simple/_transactions.html" %}{% endwith %}
+    {% else %}
+    <p class="muted empty">No hay operaciones para estos filtros.</p>
+    {% endfor %}
+</section>
+
+<nav class="pagination" aria-label="Páginas">
+    {% set q_param = ('&q=' ~ q) if q else '' %}
+    {% set cat_param = ('&category_id=' ~ category_id) if category_id else '' %}
+    {% set acc_param = ('&account_id=' ~ account_id) if account_id else '' %}
+    {% set kind_param = ('&kind=' ~ kind) if kind else '' %}
+    {% set scope_param = ('&scope=' ~ scope) if scope else '' %}
+    
+    {% if page > 1 %}
+    <a class="secondary-button" href="/s/list?page={{ page - 1 }}&window={{ window }}&as_of={{ as_of }}{{ q_param }}{{ cat_param }}{{ acc_param }}{{ kind_param }}{{ scope_param }}">Anterior</a>
+    {% endif %}
+    {% if has_next %}
+    <a class="secondary-button" href="/s/list?page={{ page + 1 }}&window={{ window }}&as_of={{ as_of }}{{ q_param }}{{ cat_param }}{{ acc_param }}{{ kind_param }}{{ scope_param }}">Siguiente</a>
+    {% endif %}
+</nav>
+{% endblock %}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+<symbol id="receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z M9 7h6 M9 11h6 M9 15h4"/></symbol>
+<symbol id="cart" viewBox="0 0 24 24"><path d="M3 4h3l2 12h11l2-8H7 M10 20h0 M18 20h0"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></symbol>
+<symbol id="home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8 M5 10v11h14V10 M9 21v-7h6v7"/></symbol>
+<symbol id="car" viewBox="0 0 24 24"><path d="M4 18V9l3-5h10l3 5v9H4Z M4 10h16 M7 14h1 M16 14h1 M6 18v3 M18 18v3"/></symbol>
+<symbol id="food" viewBox="0 0 24 24"><path d="M5 3v6c0 3 4 3 4 0V3 M7 3v18 M18 3c-4 2-4 8 0 9V3 21"/></symbol>
+<symbol id="health" viewBox="0 0 24 24"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3Z"/></symbol>
+<symbol id="education" viewBox="0 0 24 24"><path d="m2 9 10-5 10 5-10 5-10-5Z M6 12v6c4 3 8 3 12 0v-6 M22 9v8"/></symbol>
+<symbol id="gift" viewBox="0 0 24 24"><path d="M3 8h18v5H3V8Z M5 13v8h14v-8 M12 8v13 M12 8C5 8 5 2 8 3c3 0 4 5 4 5Zm0 0c7 0 7-6 4-5-3 0-4 5-4 5Z"/></symbol>
+<symbol id="wallet" viewBox="0 0 24 24"><path d="M3 6h17v15H3V6Z M3 6l15-3v3 M20 11h-6v5h6 M17 13h0"/></symbol>
+<symbol id="work" viewBox="0 0 24 24"><path d="M3 8h18v13H3V8Z M8 8V3h8v5 M3 13h18 M10 12v3h4v-3"/></symbol>
+<symbol id="other" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></symbol>
+<symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13 M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/></symbol>
+<symbol id="scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8 8 13 13 M8 16 21 3"/></symbol>
+<symbol id="dye" viewBox="0 0 24 24"><path d="M7 3h10l-1 13H8L7 3Z M8 6h8 M10 16v5h4v-5 M10 11h4"/></symbol>
+</svg>

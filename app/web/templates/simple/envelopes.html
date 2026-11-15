@@ -1,0 +1,43 @@
+{% extends "simple/base.html" %}
+{% block content %}
+<div class="screen-title" style="margin-bottom: 1rem;">
+    <h1>Sobres y Metas ✉️</h1>
+    <a href="/envelopes" class="secondary-button" style="font-size: .85rem; padding: .4rem .8rem;">Gestionar</a>
+</div>
+
+<section class="balance-card" style="margin-bottom: 1.25rem;">
+    <span class="muted">Total apartado en sobres</span>
+    <strong style="color: #86efac;">{{ total_reserved | currency }}</strong>
+    <p class="muted" style="margin-top: .4rem; font-size: .85rem;">
+        Fondo disponible sin apartar: {{ available_fund | currency }}
+    </p>
+</section>
+
+<section class="simple-card">
+    <h2>Tus sobres</h2>
+    {% for env in envelopes %}
+    <div style="background: var(--bg); border: 1px solid var(--border); border-radius: .85rem; padding: 1rem; margin-bottom: .85rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem;">
+            <strong>{{ env.name }}</strong>
+            <strong style="color: var(--accent); font-size: 1.1rem;">{{ env.balance | currency }}</strong>
+        </div>
+        {% if env.target_amount %}
+        <div style="font-size: .8rem; color: var(--muted); margin-bottom: .4rem;">
+            Meta: {{ env.target_amount | currency }} ({{ env.percentage }}%)
+        </div>
+        <div style="background: var(--border); border-radius: 9999px; height: 8px; overflow: hidden; width: 100%;">
+            <div style="background: #38bdf8; height: 100%; width: {{ env.percentage }}%;"></div>
+        </div>
+        {% else %}
+        <span class="muted" style="font-size: .8rem;">Sobre de reserva continua</span>
+        {% endif %}
+    </div>
+    {% else %}
+    <p class="muted empty">No hay sobres activos.</p>
+    {% endfor %}
+</section>
+
+<a href="/envelopes" class="primary-button wide" style="text-align: center; text-decoration: none;">
+    Apartar o retirar dinero de sobres
+</a>
+{% endblock %}

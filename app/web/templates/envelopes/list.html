@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <div>
+        <h2 style="font-size: 1.25rem; font-weight: 700;">Sobres y Metas</h2>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Apartados virtuales dentro del fondo común</span>
+    </div>
+    <a href="/envelopes/new-goal" class="btn btn-primary btn-sm">+ Nueva Meta</a>
+</div>
+
+{% if success_msg %}
+<div class="alert alert-success">{{ success_msg }}</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- Tarjeta de Resumen -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+    <div class="card" style="margin-bottom: 0; padding: 1rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Disponible Libre</span>
+        <div style="font-size: 1.25rem; font-weight: 700; {% if available_fund < 0 %}color: var(--danger);{% else %}color: var(--success);{% endif %} margin-top: 0.2rem;">
+            {{ available_fund | currency }}
+        </div>
+    </div>
+    <div class="card" style="margin-bottom: 0; padding: 1rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Apartado</span>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary); margin-top: 0.2rem;">
+            {{ total_envelopes | currency }}
+        </div>
+    </div>
+</div>
+
+<!-- Sobres de Sistema -->
+{% if retirement.record_count %}
+<section class="card external-retirement" aria-label="Ahorro externo registrado">
+    <h3>Retiro y ahorro externo</h3>
+    <p><strong>{{ retirement.total_registered|currency }}</strong> en aportes brutos registrados.</p>
+    <p>Dinero destinado a la aseguradora. No forma parte del Total Apartado ni se descuenta otra vez del Disponible.</p>
+    <a class="btn btn-outline" href="/envelopes/retirement">Ver aportes e histórico</a>
+</section>
+{% endif %}
+<h3 style="font-size: 1rem; color: var(--text-color); margin-bottom: 0.6rem;">Sobres del Sistema</h3>
+<div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+    {% for env in system_envelopes %}
+    <div class="card" style="padding: 1rem; margin-bottom: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div>
+                <span style="font-weight: 600; font-size: 1.05rem;">{{ env.name }}</span>
+                <span class="badge badge-info" style="margin-left: 0.4rem;">Sistema</span>
+            </div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: var(--text-color);">
+                {{ env.balance | currency }}
+            </div>
+        </div>
+
+        <!-- Acciones rápidas Asignar / Liberar -->
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+            <button type="button" class="btn btn-outline btn-sm js-toggle-env" style="flex: 1;" data-target="alloc-{{ env.id }}">+ Asignar</button>
+            <button type="button" class="btn btn-outline btn-sm js-toggle-env" style="flex: 1;" data-target="rel-{{ env.id }}">- Liberar</button>
+        </div>
+
+        <!-- Formulario Asignar -->
+        <div id="alloc-{{ env.id }}" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <form method="POST" action="/envelopes/{{ env.id }}/allocate" style="display: flex; gap: 0.4rem; align-items: center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                <input type="text" name="amount" inputmode="decimal" placeholder="Monto a asignar" required class="form-control" style="min-height: 38px; font-size: 0.9rem;">
+                <button type="submit" class="btn btn-success btn-sm" style="white-space: nowrap;">Confirmar</button>
+            </form>
+        </div>
+
+        <!-- Formulario Liberar -->
+        <div id="rel-{{ env.id }}" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <form method="POST" action="/envelopes/{{ env.id }}/release" style="display: flex; gap: 0.4rem; align-items: center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                <input type="text" name="amount" inputmode="decimal" placeholder="Monto a liberar" required class="form-control" style="min-height: 38px; font-size: 0.9rem;">
+                <button type="submit" class="btn btn-danger btn-sm" style="white-space: nowrap;">Confirmar</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Metas Financieras -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+    <h3 style="font-size: 1rem; color: var(--text-color);">Metas y Ahorros de la Pareja</h3>
+</div>
+
+{% if goal_envelopes %}
+<div style="display: flex; flex-direction: column; gap: 0.75rem;">
+    {% for goal in goal_envelopes %}
+    <div class="card" style="padding: 1rem; margin-bottom: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem;">
+            <div>
+                <span style="font-weight: 600; font-size: 1.05rem;">{{ goal.name }}</span>
+                {% if goal.target_date %}
+                <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Objetivo: {{ goal.target_date | date }}</span>
+                {% endif %}
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 1.15rem; font-weight: 700; color: var(--primary);">{{ goal.balance | currency }}</span>
+                {% if goal.target_amount %}
+                <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">de {{ goal.target_amount | currency }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Barra de progreso -->
+        <div style="background-color: var(--border); border-radius: 9999px; height: 8px; width: 100%; margin: 0.5rem 0; overflow: hidden;">
+            <div style="background-color: var(--primary); height: 100%; width: {{ goal.progress_clamped }}%;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+            <span>Progreso: {{ goal.progress | decimal_ar }} %</span>
+            {% if goal.monthly_contribution %}
+            <span>Sugerido: <strong>{{ goal.monthly_contribution | currency }} / mes</strong></span>
+            {% endif %}
+        </div>
+
+        <!-- Acciones rápidas Asignar / Liberar / Eliminar (si saldo == 0) -->
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+            <button type="button" class="btn btn-outline btn-sm js-toggle-env" style="flex: 1; min-height: 44px;" data-target="alloc-{{ goal.id }}">+ Asignar</button>
+            <button type="button" class="btn btn-outline btn-sm js-toggle-env" style="flex: 1; min-height: 44px;" data-target="rel-{{ goal.id }}">- Liberar</button>
+            {% if goal.balance == 0 %}
+            <form method="POST" action="/envelopes/{{ goal.id }}/delete" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                <button type="submit" class="btn btn-danger btn-sm js-confirm" style="min-height: 44px;" data-confirm="¿Dar de baja el sobre '{{ goal.name }}'?">Eliminar</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <!-- Formulario Asignar -->
+        <div id="alloc-{{ goal.id }}" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <form method="POST" action="/envelopes/{{ goal.id }}/allocate" style="display: flex; gap: 0.4rem; align-items: center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                <input type="text" name="amount" inputmode="decimal" placeholder="Monto a asignar" required class="form-control" style="min-height: 44px; font-size: 0.9rem;">
+                <button type="submit" class="btn btn-success btn-sm" style="white-space: nowrap; min-height: 44px;">Confirmar</button>
+            </form>
+        </div>
+
+        <!-- Formulario Liberar -->
+        <div id="rel-{{ goal.id }}" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <form method="POST" action="/envelopes/{{ goal.id }}/release" style="display: flex; gap: 0.4rem; align-items: center;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+                <input type="text" name="amount" inputmode="decimal" placeholder="Monto a liberar" required class="form-control" style="min-height: 44px; font-size: 0.9rem;">
+                <button type="submit" class="btn btn-danger btn-sm" style="white-space: nowrap; min-height: 44px;">Confirmar</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p style="color: var(--text-muted); font-size: 0.85rem; padding: 1rem 0; text-align: center;">
+    No hay metas creadas todavía. Creá una para apartar plata hacia un objetivo común.
+</p>
+{% endif %}
+
+<script nonce="{{ csp_nonce(request) }}">
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.js-toggle-env');
+    if (btn && btn.dataset.target) {
+        const el = document.getElementById(btn.dataset.target);
+        if (el) {
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Negocio / Emprendimiento</h1>
+<p>Cobros y gastos del negocio. El resultado participa del fondo del hogar; no se carga como otro ingreso.</p>
+<form method="get" action="/business">
+  <label class="form-label" for="business-period">Mes contable</label>
+  <input class="form-control" id="business-period" type="month" name="period" value="{{ period }}" required>
+  <button class="btn" type="submit">Consultar</button>
+</form>
+<section class="card">
+  <h2>Resultado del mes</h2>
+  <p>Cobros: {{ summary.income | currency }}</p>
+  <p>Gastos: {{ summary.expense | currency }}</p>
+  <p><strong>Resultado: {{ summary.result | currency }}</strong></p>
+  <p>Las pérdidas reducen el fondo del hogar. Por ahora no se reserva dinero para el local.</p>
+</section>
+<p><a class="btn" href="/transactions/new?kind=income&amp;activity=business">Registrar cobro</a>
+<a class="btn" href="/transactions/new?kind=expense&amp;activity=business">Registrar gasto</a></p>
+<section class="card">
+  <h2>Movimientos</h2>
+  {% for tx in transactions %}
+  <article>
+    <a class="btn btn-outline" href="/transactions/{{ tx.id }}">{{ tx.description }}</a>
+    <p>{{ tx.date | date }} · {{ accounts.get(tx.account_id, 'Cuenta desconocida') }} · {{ categories.get(tx.category_id, '') }}</p>
+    <p>{{ '+' if tx.kind == 'income' else '−' }} {{ tx.amount | currency }}</p>
+  </article>
+  {% else %}<p>No hay movimientos del negocio para este mes.</p>{% endfor %}
+</section>
+{% endblock %}
