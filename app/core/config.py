@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     APP_BIND_ADDRESS: str = "127.0.0.1"
     FX_AUTOMATIC_ENABLED: bool = True
 
+    # Token de autorización previo para /setup (opcional, protege la instancia antes del onboarding)
+    SETUP_TOKEN: str | None = None
+
     # Google Gemini AI - Opcional
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-2.5-flash"

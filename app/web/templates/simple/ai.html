@@ -186,7 +186,15 @@ document.addEventListener('DOMContentLoaded', function() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (voiceBtn && rawText) {
-        if (!SpeechRecognition) {
+        if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            voiceBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (voiceStatus) {
+                    voiceStatus.textContent = '🔒 El reconocimiento de voz requiere conexión segura (HTTPS o localhost). En HTTP el navegador bloquea el micrófono por seguridad.';
+                    voiceStatus.style.display = 'block';
+                }
+            });
+        } else if (!SpeechRecognition) {
             voiceBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 if (voiceStatus) {
@@ -196,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } else {
             var recognition = new SpeechRecognition();
-            recognition.lang = 'es-AR';
+            recognition.lang = document.documentElement.lang || 'es-AR';
             recognition.continuous = false;
             recognition.interimResults = true;
 

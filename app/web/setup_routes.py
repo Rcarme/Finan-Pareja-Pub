@@ -1,16 +1,28 @@
 """Rutas del asistente de configuración inicial (/setup)."""
 
+import secrets
+
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth import create_session
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.middleware import invalidate_onboarding_cache
 from app.core.security import generate_csrf_token, secure_cookies, validate_csrf
 from app.services.setup_service import initialize_instance, is_onboarded
 
 setup_router = APIRouter(prefix="/setup", tags=["setup"])
+
+
+def _is_setup_token_valid(provided_token: str | None) -> bool:
+    expected = (settings.SETUP_TOKEN or "").strip()
+    if not expected:
+        return True
+    if not provided_token or not provided_token.strip():
+        return False
+    return secrets.compare_digest(provided_token.strip(), expected)
 
 
 @setup_router.get("", response_class=HTMLResponse)
@@ -21,12 +33,19 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
     from app.web.app import templates
 
     csrf_token = generate_csrf_token()
+    query_token = request.query_params.get("token", "")
+    error_msg = None
+    if settings.SETUP_TOKEN and query_token and not _is_setup_token_valid(query_token):
+        error_msg = "El token de instalación proporcionado en el enlace es inválido."
+
     response = templates.TemplateResponse(
         request=request,
         name="setup.html",
         context={
             "csrf_token": csrf_token,
-            "error": None,
+            "error": error_msg,
+            "require_setup_token": bool(settings.SETUP_TOKEN),
+            "setup_token": query_token if _is_setup_token_valid(query_token) else "",
         },
     )
     response.set_cookie(
@@ -44,6 +63,7 @@ async def process_setup(
     request: Request,
     db: Session = Depends(get_db),
     csrf_token: str = Form(...),
+    setup_token: str = Form(""),
     user1_username: str = Form(...),
     user1_display_name: str = Form(""),
     user1_password: str = Form(...),
@@ -69,8 +89,25 @@ async def process_setup(
             context={
                 "csrf_token": generate_csrf_token(),
                 "error": "El token de seguridad expiró. Por favor, recargá e intentá nuevamente.",
+                "require_setup_token": bool(settings.SETUP_TOKEN),
+                "setup_token": setup_token if _is_setup_token_valid(setup_token) else "",
             },
             status_code=400,
+        )
+
+    if settings.SETUP_TOKEN and not _is_setup_token_valid(setup_token):
+        from app.web.app import templates
+
+        return templates.TemplateResponse(
+            request=request,
+            name="setup.html",
+            context={
+                "csrf_token": generate_csrf_token(),
+                "error": "Token de instalación previo inválido. Verificá SETUP_TOKEN en tu .env.",
+                "require_setup_token": True,
+                "setup_token": "",
+            },
+            status_code=403,
         )
 
     try:

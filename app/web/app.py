@@ -61,7 +61,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="Finanzas en Común",
     description="Gestión compartida de finanzas para pareja",
-    version="0.1.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
@@ -141,9 +141,22 @@ app.include_router(ownership_router)
 
 
 @app.get("/healthz", response_model=None)
-def healthz() -> dict[str, Any] | JSONResponse:
-    """Endpoint de salud para monitorización y healthcheck (RN-38, ARCHITECTURE.md §5, §6)."""
+def healthz(request: Request) -> dict[str, Any] | JSONResponse:
+    """Endpoint de salud para monitorización y healthcheck (RN-38, ARCHITECTURE.md §5, §6).
+
+    Provee un chequeo mínimo sin revelar metadata a visitantes anónimos; detalla
+    el estado de backup y entorno únicamente a usuarios autenticados.
+    """
     db_ok = check_db_connection()
+    is_authenticated = bool(getattr(request.state, "user", None))
+
+    # Para monitoreo anónimo / Docker probes: respuesta mínima sin fuga de información interna
+    if not is_authenticated:
+        payload = {"status": "ok" if db_ok else "degraded"}
+        if not db_ok:
+            return JSONResponse(status_code=503, content=payload)
+        return payload
+
     backup_info: dict[str, Any] = {
         "status": "unknown",
         "hours_since_backup": None,
@@ -168,7 +181,7 @@ def healthz() -> dict[str, Any] | JSONResponse:
         finally:
             db.close()
 
-    payload = {
+    detailed_payload = {
         "status": "ok" if db_ok else "degraded",
         "database": "connected" if db_ok else "disconnected",
         "backup": backup_info,
@@ -176,5 +189,5 @@ def healthz() -> dict[str, Any] | JSONResponse:
         "timestamp": datetime.now(UTC).isoformat(),
     }
     if not db_ok:
-        return JSONResponse(status_code=503, content=payload)
-    return payload
+        return JSONResponse(status_code=503, content=detailed_payload)
+    return detailed_payload

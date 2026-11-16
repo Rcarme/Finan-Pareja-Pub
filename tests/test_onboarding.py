@@ -123,3 +123,26 @@ def test_onboarding_validation_rules(db_session):
             user2_password="Password654321!",
             currency="USD",
         )
+
+
+def test_setup_token_protection():
+    """Verifica que _is_setup_token_valid valide correctamente contra SETUP_TOKEN."""
+    from app.core.config import settings
+    from app.web.setup_routes import _is_setup_token_valid
+
+    original_token = settings.SETUP_TOKEN
+    try:
+        # 1. Sin SETUP_TOKEN configurado, cualquier valor (o None) es válido
+        settings.SETUP_TOKEN = None
+        assert _is_setup_token_valid(None) is True
+        assert _is_setup_token_valid("cualquier-token") is True
+
+        # 2. Con SETUP_TOKEN configurado, requiere coincidencia de tiempo constante
+        settings.SETUP_TOKEN = "secret-installation-token-12345"
+        assert _is_setup_token_valid(None) is False
+        assert _is_setup_token_valid("") is False
+        assert _is_setup_token_valid("token_incorrecto") is False
+        assert _is_setup_token_valid("secret-installation-token-12345") is True
+        assert _is_setup_token_valid("  secret-installation-token-12345  ") is True
+    finally:
+        settings.SETUP_TOKEN = original_token

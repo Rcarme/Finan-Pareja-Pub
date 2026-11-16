@@ -114,25 +114,31 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- Auditoría (RN-37): estrictamente append-only (SELECT, INSERT; sin UPDATE ni DELETE)
+    -- Auditoría (RN-37): estrictamente append-only (SELECT, INSERT; sin UPDATE ni DELETE ni TRUNCATE)
     IF to_regclass('public.audit_log') IS NOT NULL THEN
         GRANT SELECT, INSERT ON TABLE public.audit_log TO finanzas_app;
         REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.audit_log FROM finanzas_app;
 
-        -- Trigger de defensa en profundidad: UPDATE o DELETE arroja excepción en el motor
+        -- Trigger de defensa en profundidad: UPDATE, DELETE o TRUNCATE arroja excepción en el motor
         EXECUTE $fn$
             CREATE OR REPLACE FUNCTION trg_audit_log_immutable()
             RETURNS TRIGGER AS $$
             BEGIN
-                RAISE EXCEPTION 'audit_log es estrictamente append-only: UPDATE y DELETE están prohibidos.';
+                RAISE EXCEPTION 'audit_log es estrictamente append-only: UPDATE, DELETE y TRUNCATE están prohibidos.';
             END;
             $$ LANGUAGE plpgsql;
         $fn$;
 
         DROP TRIGGER IF EXISTS trg_audit_log_protect ON public.audit_log;
-        CREATE TRIGGER trg_audit_log_protect
+        DROP TRIGGER IF EXISTS trg_audit_log_protect_row ON public.audit_log;
+        CREATE TRIGGER trg_audit_log_protect_row
         BEFORE UPDATE OR DELETE ON public.audit_log
         FOR EACH ROW EXECUTE FUNCTION trg_audit_log_immutable();
+
+        DROP TRIGGER IF EXISTS trg_audit_log_protect_truncate ON public.audit_log;
+        CREATE TRIGGER trg_audit_log_protect_truncate
+        BEFORE TRUNCATE ON public.audit_log
+        FOR EACH STATEMENT EXECUTE FUNCTION trg_audit_log_immutable();
     END IF;
 
     -- Pertenencia del dinero: correcciones por contrapartida, nunca mutación del asiento.

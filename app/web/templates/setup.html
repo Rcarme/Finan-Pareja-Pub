@@ -19,6 +19,23 @@
     <form method="POST" action="/setup" style="display: flex; flex-direction: column; gap: 1.5rem;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
+        {% if require_setup_token %}
+        <div class="card" style="padding: 1.25rem; border: 1px solid rgba(56, 189, 248, 0.4);">
+            <h2 style="font-size: 1.15rem; color: #38bdf8; margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>🔐</span> Autorización previa requerida
+            </h2>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.75rem;">
+                Esta instancia está protegida con un token de autorización configurado en <code>SETUP_TOKEN</code>.
+            </p>
+            <div>
+                <label for="setup_token" style="display: block; font-size: 0.8rem; color: #cbd5e1; margin-bottom: 0.25rem;">Token de Instalación</label>
+                <input type="password" id="setup_token" name="setup_token" value="{{ setup_token }}" required placeholder="Pegá acá el SETUP_TOKEN de tu archivo .env" style="width: 100%; min-height: 40px; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid var(--border); background: var(--bg-color); color: #fff;">
+            </div>
+        </div>
+        {% else %}
+        <input type="hidden" name="setup_token" value="{{ setup_token }}">
+        {% endif %}
+
         <!-- Bloque 1: Integrantes de la pareja -->
         <div class="card" style="padding: 1.25rem;">
             <h2 style="font-size: 1.15rem; color: #38bdf8; margin-top: 0; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">

@@ -12,7 +12,7 @@ dominio (app.domain.reports) para generar:
 """
 
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
@@ -300,7 +300,7 @@ def get_department_report(db: Session, year: int | None = None) -> DepartmentMet
             tx.fx_rate_effective
             if (tx and tx.fx_rate_effective)
             else (
-                (ars_amt / item.usd_amount).quantize(Decimal("0.0001"))
+                (ars_amt / item.usd_amount).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
                 if item.usd_amount > Decimal("0.00")
                 else Decimal("0.0000")
             )
