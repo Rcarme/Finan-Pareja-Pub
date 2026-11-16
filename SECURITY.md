@@ -11,7 +11,19 @@ Nos tomamos muy en serio la seguridad y la privacidad de las finanzas personales
 
 ---
 
-## 🇪🇸 Reportar una Vulnerabilidad
+## 🇬🇧 Reporting a Vulnerability
+
+If you discover a security vulnerability in this project:
+
+1. **Please DO NOT create a public GitHub issue.**
+2. Use GitHub's private vulnerability reporting feature:
+   - Go to the **Security** tab of this repository.
+   - Click on **"Report a vulnerability"** to submit an encrypted report directly to the maintainers.
+3. We will acknowledge receipt within 48 hours and work with you to patch and disclose the issue responsibly.
+
+---
+
+## 🇦🇷 Reportar una Vulnerabilidad
 
 Si descubrís una vulnerabilidad o fallo de seguridad en este proyecto:
 
@@ -25,15 +37,3 @@ Si descubrís una vulnerabilidad o fallo de seguridad en este proyecto:
 - Confirmaremos la recepción de tu reporte dentro de las 48 horas hábiles.
 - Evaluaremos el impacto y trabajaremos en una solución que se publicará de manera coordinada.
 - Se te dará el debido crédito en las notas de la versión (si así lo deseás).
-
----
-
-## 🇬🇧 Reporting a Vulnerability
-
-If you discover a security vulnerability in this project:
-
-1. **Please DO NOT create a public GitHub issue.**
-2. Use GitHub's private vulnerability reporting feature:
-   - Go to the **Security** tab of this repository.
-   - Click on **"Report a vulnerability"** to submit an encrypted report directly to the maintainers.
-3. We will acknowledge receipt within 48 hours and work with you to patch and disclose the issue responsibly.

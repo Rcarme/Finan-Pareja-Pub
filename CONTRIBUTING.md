@@ -4,7 +4,53 @@
 
 ---
 
-## 🇪🇸 Español
+## 🇬🇧 English
+
+### 1. Core Architectural Invariants
+When submitting pull requests, please respect the project's core invariants:
+- **Money must always be `Decimal`:** Floating point arithmetic is strictly forbidden for currency values. Use `ROUND_HALF_UP` for daily operations and `ROUND_FLOOR` for settlement distributions.
+- **Immutable Audit Trail (Append-Only):** Accounting records are never deleted (`DELETE`). Voids and reversals require user attribution and explicit reasons in `audit_log`.
+- **Privacy-first & Zero Telemetry:** Self-hosted by design. No tracking or external data transmission (except optional Google Gemini AI API when explicitly configured).
+- **Optimistic Concurrency Control:** Account, category, and transaction updates must respect the `version` column.
+
+### 2. Local Development Workflow
+1. Fork the repo and clone locally:
+   ```bash
+   git clone https://github.com/YOUR_USER/Finan-Pareja-Pub.git
+   cd Finan-Pareja-Pub
+   ```
+2. Create and activate a Python 3.11+ virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/macOS
+   .venv\Scripts\activate     # Windows
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.lock
+   pip install pytest pytest-cov ruff mypy
+   ```
+4. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+### 3. Code Quality & Testing
+Before opening a Pull Request, ensure all linters and tests pass:
+```bash
+# Check code style and linting
+ruff check .
+
+# Check automatic formatting
+ruff format --check .
+
+# Run test suite
+python -m pytest tests/ -v
+```
+
+---
+
+## 🇦🇷 Español
 
 ### 1. Principios de Diseño No Negociables
 Al proponer cambios o nuevas funcionalidades, respetá los pilares fundamentales del sistema:
@@ -47,20 +93,3 @@ ruff format --check .
 # Ejecutar la suite completa de pruebas unitarias
 python -m pytest tests/ -v
 ```
-
----
-
-## 🇬🇧 English
-
-### 1. Core Architectural Invariants
-When submitting pull requests, please respect the project's core invariants:
-- **Money must always be `Decimal`:** Floating point arithmetic is strictly forbidden for currency values.
-- **Immutable Audit Trail:** Accounting records are append-only. Voids and reversals require user attribution and reasons.
-- **Privacy-first & Self-hosted:** No third-party trackers or telemetry.
-- **Optimistic Concurrency Control:** Account, category, and transaction updates must respect the `version` column.
-
-### 2. Pull Request Guidelines
-1. Fork the repo and create your branch from `main`.
-2. Ensure `ruff check .`, `ruff format --check .`, and `python -m pytest tests/ -v` pass cleanly.
-3. Write clear commit messages following Conventional Commits (`feat: ...`, `fix: ...`, `docs: ...`).
-4. Submit your pull request with a descriptive summary of your changes.

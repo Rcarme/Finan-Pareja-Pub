@@ -7,12 +7,54 @@
 [![Docker](https://img.shields.io/badge/Deploy-Docker_Compose-2496ED?logo=docker)](https://www.docker.com/)
 [![Gemini AI](https://img.shields.io/badge/AI-Google_Gemini-8E75C2?logo=google)](https://aistudio.google.com/)
 
-[Español](#español) | [English](#english)
+[English](#english) | [Español](#español)
+
+---
+
+<a name="english"></a>
+## 🇬🇧 English
+
+**Finanzas en Pareja (Couple Finance OS)** is a shared domestic accounting and financial management web application built for couples and modern households.
+
+It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), append-only immutable auditing, native dual-currency management, **AI Assistant with Voice Dictation (Google Gemini + Web Speech API)**, and automated encrypted daily backups using `age` with Grandfather-Father-Son (GFS) retention.
+
+---
+
+### 🌟 Key Architectural Features
+
+- **Strict Banking Precision:** All monetary calculations use Python `Decimal` with `ROUND_HALF_UP`. Floating-point math is strictly forbidden.
+- **Immutable Audit Trail:** Deletions and reversals are strictly logged in an append-only `audit_log` with user attribution and reason.
+- **Dual UI Experience:**
+  - **Simple Mode (390px Mobile-First):** Lightning-fast daily expense logging, instant balance checks, and speech-to-text input.
+  - **Full Mode:** Credit card reconciliation, balance carryovers, formal monthly closes, and analytics.
+- **AI Voice Assistant:** Natural language parsing of receipts, tickets, and informal messages via Google Gemini with automated duplicate detection.
+- **Zero-Setup Onboarding Wizard:** Self-contained `/setup` wizard on first run to configure partners, household currency, split ratios, and default accounts.
+- **Homelab Ready:** Production-grade `docker-compose.yml` with least-privilege PostgreSQL roles and automated encrypted off-site backups via `age` and `rclone`.
+
+---
+
+### ⚡ Quickstart with Docker
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Rcarme/Finan-Pareja-Pub.git
+cd Finan-Pareja-Pub
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env and set APP_SECRET_KEY and PostgreSQL passwords
+
+# 3. Launch with Docker Compose
+docker compose up -d
+
+# 4. Open in your browser
+# Visit http://localhost:8088 to complete the Onboarding Wizard
+```
 
 ---
 
 <a name="español"></a>
-## 🇪🇸 Español
+## 🇦🇷 Español
 
 **Finanzas en Pareja** es una plataforma web completa de contabilidad doméstica compartida, diseñada específicamente para parejas y hogares que desean transparencia financiera, equidad y simplicidad en el día a día.
 
@@ -133,48 +175,6 @@ La clave privada de `age` **nunca se almacena en el servidor**, garantizando que
 
 ---
 
-<a name="english"></a>
-## 🇬🇧 English
-
-**Finanzas en Pareja (Couple Finance OS)** is a shared domestic accounting and financial management web application built for couples and modern households.
-
-It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), append-only immutable auditing, native dual-currency management, **AI Assistant with Voice Dictation (Google Gemini + Web Speech API)**, and automated encrypted daily backups using `age` with Grandfather-Father-Son (GFS) retention.
-
----
-
-### 🌟 Key Architectural Features
-
-- **Strict Banking Precision:** All monetary calculations use Python `Decimal` with `ROUND_HALF_UP`. Floating-point math is strictly forbidden.
-- **Immutable Audit Trail:** Deletions and reversals are strictly logged in an append-only `audit_log` with user attribution and reason.
-- **Dual UI Experience:**
-  - **Simple Mode (390px Mobile-First):** Lightning-fast daily expense logging, instant balance checks, and speech-to-text input.
-  - **Full Mode:** Credit card reconciliation, balance carryovers, formal monthly closes, and analytics.
-- **AI Voice Assistant:** Natural language parsing of receipts, tickets, and informal messages via Google Gemini with automated duplicate detection.
-- **Zero-Setup Onboarding Wizard:** Self-contained `/setup` wizard on first run to configure partners, household currency, split ratios, and default accounts.
-- **Homelab Ready:** Production-grade `docker-compose.yml` with least-privilege PostgreSQL roles and automated encrypted off-site backups via `age` and `rclone`.
-
----
-
-### ⚡ Quickstart with Docker
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/Rcarme/Finan-Pareja-Pub.git
-cd Finan-Pareja-Pub
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env and set APP_SECRET_KEY and PostgreSQL passwords
-
-# 3. Launch with Docker Compose
-docker compose up -d
-
-# 4. Open in your browser
-# Visit http://localhost:8088 to complete the Onboarding Wizard
-```
-
----
-
 ### 🤝 Comunidad y Documentación / Community & Docs
 
 - **Arquitectura y Modelo Contable:** [ARCHITECTURE.md](ARCHITECTURE.md)
@@ -182,6 +182,7 @@ docker compose up -d
 - **Guía de Contribución:** [CONTRIBUTING.md](CONTRIBUTING.md)
 - **Política de Seguridad:** [SECURITY.md](SECURITY.md)
 - **Código de Conducta:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- **Hoja de Ruta (Roadmap):** [ROADMAP.md](ROADMAP.md)
 
 ---
 
