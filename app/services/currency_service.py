@@ -3,10 +3,10 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import atomic_service, commit_service
 from app.domain.exchange import effective_exchange_rate
 from app.models.ledger import Account
@@ -26,7 +26,7 @@ def convert_reserved_usd(
     user_id: int,
 ) -> list[OwnershipEntry]:
     rate = effective_exchange_rate(usd_amount, ars_received)
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     summary = get_ownership_summary(db)
     if summary is None:
         raise ValueError("Primero registrá la apertura del dinero.")

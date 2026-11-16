@@ -5,10 +5,11 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.formatters import today_ar
 from app.core.transactions import atomic_service, commit_service
 from app.domain.obligations import (
@@ -354,7 +355,7 @@ def pay_obligation_item(
     Crea un movimiento de gasto (expense) enlazado al item y lo pasa a estado 'pagado'.
     Si pay_from_envelope es True, asocia el gasto al sobre correspondiente (RN-31).
     """
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     item = db.execute(
         select(ObligationItem)
         .where(ObligationItem.id == item_id)

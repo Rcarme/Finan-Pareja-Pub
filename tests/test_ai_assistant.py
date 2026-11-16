@@ -132,12 +132,11 @@ def test_get_effective_gemini_api_key_with_rotated_key():
 
 
 def test_get_effective_gemini_api_key_migrates_legacy_secret_on_read():
-    """Verifica que un secreto legado (XOR) se migre a Fernet v2 (HKDF) al leerse."""
-    import base64
-    import hashlib
+    """Verifica que un secreto legado sin prefijo v2 se migre a Fernet v2 (HKDF) al leerse."""
+    from cryptography.fernet import Fernet
 
-    from app.core.config import settings
     from app.core.db import get_engine, get_session_factory
+    from app.core.security import _derive_legacy_sha256_fernet_key
     from app.models.base import Base
     from app.models.close import Setting
     from app.services.ai_assistant_service import get_effective_gemini_api_key
@@ -145,12 +144,10 @@ def test_get_effective_gemini_api_key_migrates_legacy_secret_on_read():
     Base.metadata.create_all(bind=get_engine())
     session = get_session_factory()()
     try:
-        # Generar manualmente un token XOR legacy
-        key_str = settings.APP_SECRET_KEY
-        legacy_key = hashlib.sha256(key_str.encode("utf-8")).digest()
-        raw_secret = b"my-special-gemini-key-999"
-        xor_bytes = bytes(b ^ legacy_key[i % len(legacy_key)] for i, b in enumerate(raw_secret))
-        legacy_token = "enc:" + base64.b64encode(xor_bytes).decode("ascii")
+        # Generar manualmente un token legado v1 sin prefijo v2
+        f_legacy = Fernet(_derive_legacy_sha256_fernet_key())
+        raw_secret = "my-special-gemini-key-999"
+        legacy_token = "enc:" + f_legacy.encrypt(raw_secret.encode("utf-8")).decode("ascii")
 
         setting = session.query(Setting).filter(Setting.key == "gemini_api_key").first()
         if not setting:

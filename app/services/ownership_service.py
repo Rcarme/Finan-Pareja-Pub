@@ -5,11 +5,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import atomic_service, commit_service
 from app.domain.ownership import common_fund, personal_balance
 from app.domain.ownership import validate_money as _money
@@ -113,7 +114,7 @@ def activate_ownership(
 ) -> Setting:
     from app.services.ledger_service import check_period_open
 
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     for amount in (
         list(account_balances.values())
         + list(personal_balances.values())
@@ -424,7 +425,7 @@ def adjust_ownership_opening(
     from app.services.ledger_service import check_period_open
 
     validate_currency(currency)
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     summary = get_ownership_summary(db)
     if summary is None:
         raise ValueError("Primero registrá la apertura.")

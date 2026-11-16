@@ -19,9 +19,13 @@ BEGIN
     END IF;
 END $$;
 
--- 2. Ownership del esquema y de tablas/secuencias existentes para el rol dueño (migraciones DDL)
-ALTER SCHEMA public OWNER TO finanzas_owner;
-GRANT ALL PRIVILEGES ON SCHEMA public TO finanzas_owner;
+-- 2. Ownership de tablas/secuencias para finanzas_owner (migraciones DDL);
+-- El schema public se mantiene bajo ownership de CURRENT_USER (admin) para imposibilitar DROP SCHEMA CASCADE (H-04).
+DO $$
+BEGIN
+    EXECUTE format('ALTER SCHEMA public OWNER TO %I', CURRENT_USER);
+END $$;
+GRANT USAGE, CREATE ON SCHEMA public TO finanzas_owner;
 
 DO $$
 DECLARE

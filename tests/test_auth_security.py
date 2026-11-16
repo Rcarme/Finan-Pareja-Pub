@@ -141,3 +141,27 @@ def test_healthz_anonymous_vs_authenticated():
     assert "environment" in data_auth
     assert "backup" in data_auth
     assert data_auth["database"] == "connected"
+
+
+def test_login_rate_limiting_anti_lockout_for_shared_ip():
+    """Verifica que un usuario bloqueado por 5 fallos no bloquee a otros usuarios del hogar."""
+    from app.core.db import get_engine, get_session_factory
+    from app.models.base import Base
+    from app.services.auth_attempt_service import is_login_rate_limited, record_login_failure
+
+    Base.metadata.create_all(bind=get_engine())
+    session = get_session_factory()()
+    shared_ip = "192.168.100.42"
+
+    try:
+        # Registrar 5 fallos para 'alex' desde shared_ip
+        for _ in range(5):
+            record_login_failure(session, shared_ip, "alex")
+
+        # 'alex' debe estar bloqueado en shared_ip
+        assert is_login_rate_limited(session, shared_ip, "alex") is True
+
+        # 'sam' en esa misma IP compartida NO debe ser bloqueado (anti-lockout del hogar)
+        assert is_login_rate_limited(session, shared_ip, "sam") is False
+    finally:
+        session.close()

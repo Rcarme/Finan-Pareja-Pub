@@ -2,11 +2,12 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import ConcurrencyError, atomic_service, commit_service
 from app.domain.category_organization import CategoryMergeConfiguration, validate_category_merge
 from app.domain.ownership import validate_activity
@@ -86,7 +87,7 @@ def list_categories(
 
 def _lock_categories(db: Session, ids: list[int]) -> dict[int, Category]:
     # El mismo orden global del libro evita que una carga atraviese una unificación.
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     return {
         category.id: category
         for category in db.scalars(

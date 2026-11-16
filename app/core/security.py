@@ -84,27 +84,17 @@ def decrypt_secret(encrypted_text: str, key_material: str | None = None) -> str:
             except (InvalidToken, ValueError):
                 return ""
 
-    # Formato legacy sin prefijo v2 (intentar Fernet primero, luego fallback XOR transparente)
-    raw_payload = encrypted_text[4:]
+    # Formato legacy sin prefijo v2 (intentar Fernet con clave primaria o legacy)
+    raw_payload = encrypted_text[4:].encode("ascii")
     try:
-        return f_primary.decrypt(raw_payload.encode("ascii")).decode("utf-8")
+        return f_primary.decrypt(raw_payload).decode("utf-8")
     except (InvalidToken, ValueError):
         pass
 
     try:
         f_legacy = Fernet(_derive_legacy_sha256_fernet_key(key_material))
-        return f_legacy.decrypt(raw_payload.encode("ascii")).decode("utf-8")
+        return f_legacy.decrypt(raw_payload).decode("utf-8")
     except (InvalidToken, ValueError):
-        pass
-
-    # Fallback de compatibilidad retroactiva para tokens XOR generados previamente
-    key_str = key_material or settings.APP_SECRET_KEY or "fallback-salt-key-material"
-    legacy_key = hashlib.sha256(key_str.encode("utf-8")).digest()
-    try:
-        raw = base64.b64decode(raw_payload.encode("ascii"))
-        decrypted = bytes(b ^ legacy_key[i % len(legacy_key)] for i, b in enumerate(raw))
-        return decrypted.decode("utf-8")
-    except Exception:
         return ""
 
 

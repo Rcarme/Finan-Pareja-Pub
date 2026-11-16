@@ -213,3 +213,22 @@ def test_account_currency_whitelist(accounting_db):
     with pytest.raises(IntegrityError):
         accounting_db.commit()
     accounting_db.rollback()
+
+
+def test_alembic_migrations_execution(tmp_path):
+    """Verifica que las migraciones de Alembic ejecuten upgrade y downgrade sin errores."""
+    from alembic import command
+    from alembic.config import Config
+
+    test_db_file = tmp_path / "test_migration_suite.db"
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{test_db_file}")
+
+    # 1. Upgrade a head debe crear el esquema e insertar los CHECKs idempotentemente
+    command.upgrade(cfg, "head")
+
+    # 2. Downgrade a 001 debe remover las restricciones nuevas
+    command.downgrade(cfg, "-1")
+
+    # 3. Re-upgrade a head debe ser reproducible
+    command.upgrade(cfg, "head")

@@ -3,10 +3,11 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import ConcurrencyError, atomic_service, commit_service
 from app.domain.ownership import credit_correction_delta
 from app.models.auth import User
@@ -106,7 +107,7 @@ def correct_account_to_credit(
     """Append the signed physical correction; never rewrite the opening or allocations."""
     from app.services.ledger_service import check_period_open
 
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     account = db.scalar(
         select(Account)
         .where(Account.id == account_id)

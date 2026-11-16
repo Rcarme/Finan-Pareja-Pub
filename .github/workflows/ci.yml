@@ -57,6 +57,20 @@ jobs:
         tar -xz -C /tmp -f /tmp/gitleaks.tar.gz gitleaks
         /tmp/gitleaks detect --verbose --redact
 
-    - name: Run unit tests
+    - name: Security audit dependencies with pip-audit
+      run: |
+        pip install pip-audit
+        pip-audit -r requirements.lock
+
+    - name: Run Alembic migrations against PostgreSQL
+      env:
+        DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123!@localhost:5432/finanzas_test
+      run: |
+        python -m alembic upgrade head
+
+    - name: Run unit and integration tests
+      env:
+        DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123!@localhost:5432/finanzas_test
+        TEST_DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123!@localhost:5432/finanzas_test
       run: |
         python -m pytest tests/ -v

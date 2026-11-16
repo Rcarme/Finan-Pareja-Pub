@@ -9,11 +9,12 @@ from urllib.error import URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
 from app.core.config import settings
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import atomic_service, commit_service
 from app.domain.fx import OfficialQuote, parse_official_quote
 from app.models.close import FxRate, Setting
@@ -129,7 +130,7 @@ def refresh_official_rate(
         quote = fetch_quote() if fetch_quote is not None else fetch_official_quote(now=timestamp)
     except (URLError, TimeoutError, ValueError, UnicodeError, OSError):
         logger.warning("No se pudo actualizar la cotización oficial; se conserva la última válida.")
-        db.execute(text("SELECT pg_advisory_xact_lock(290015)"))
+        acquire_advisory_lock(db, 290015, shared=False)
         _save_sync_status(
             db,
             timestamp,
@@ -139,7 +140,7 @@ def refresh_official_rate(
         return _latest(db)
 
     # La red se consulta antes del lock; otro proceso puede haber guardado mientras tanto.
-    db.execute(text("SELECT pg_advisory_xact_lock(290015)"))
+    acquire_advisory_lock(db, 290015, shared=False)
     automatic = _latest(db, SOURCE)
     if _is_recent(automatic, timestamp):
         commit_service(db)

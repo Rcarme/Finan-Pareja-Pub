@@ -5,10 +5,11 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.formatters import today_ar
 from app.core.transactions import atomic_service, commit_service
 from app.domain.retirement import (
@@ -79,7 +80,7 @@ def create_retirement_contributions(
     actor_id: int,
 ) -> tuple[RetirementContribution, ...]:
     inputs = validate_retirement_contributions(contributions, today_ar())
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     actor = db.get(User, actor_id)
     if actor is None or not actor.active:
         raise ValueError("El actor debe existir y estar activo.")

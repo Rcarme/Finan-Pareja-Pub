@@ -5,10 +5,11 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.formatters import today_ar
 from app.core.transactions import atomic_service, commit_service
 from app.domain.close_engine import extract_close_snapshot_metrics
@@ -354,7 +355,7 @@ def update_category_appearance(
     user_id: int,
 ) -> Category:
     validate_appearance(icon, color)
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     category = db.scalar(
         select(Category)
         .where(Category.id == category_id)

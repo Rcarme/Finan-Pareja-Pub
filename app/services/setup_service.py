@@ -12,11 +12,12 @@ Permite que cualquier pareja configure el sistema desde el navegador en el prime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.auth import ph, validate_password_strength
 from app.core.config import settings
+from app.core.db import acquire_advisory_lock
 from app.core.security import encrypt_secret
 from app.models.auth import User
 from app.models.close import Setting
@@ -70,8 +71,7 @@ def initialize_instance(
 ) -> tuple[User, User]:
     """Ejecuta la configuración inicial atómica del hogar."""
     # Advisory lock a nivel transacción en PostgreSQL para serializar concurrencia en /setup
-    if db.bind and db.bind.dialect.name == "postgresql":
-        db.execute(text("SELECT pg_advisory_xact_lock(742198421)"))
+    acquire_advisory_lock(db, 742198421, shared=False)
 
     if is_onboarded(db):
         raise ValueError("El sistema ya fue configurado previamente.")

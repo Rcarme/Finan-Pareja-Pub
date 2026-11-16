@@ -12,10 +12,11 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.formatters import today_ar
 from app.core.transactions import atomic_service, commit_service
 from app.domain.rent import (
@@ -199,7 +200,7 @@ def record_rent_collection(
     """Registra el cobro de alquiler del período como movimiento income (RN-32)."""
     normalized_period = date(period.year, period.month, 1)
     check_period_open(db, normalized_period)
-    db.execute(text("SELECT pg_advisory_xact_lock(170171)"))
+    acquire_advisory_lock(db, 170171, shared=False)
 
     # Verificar que no exista ya un cobro activo de alquiler en este período (H-08, Q22)
     existing_collection = (

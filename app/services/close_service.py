@@ -9,10 +9,11 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.formatters import today_ar
 from app.core.transactions import atomic_service, commit_service
 from app.domain.close_engine import (
@@ -297,7 +298,7 @@ def execute_close(
                 "Operación de cierre duplicada o previamente revertida."
             ) from err
 
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     try:
         # Bloqueo estricto SELECT ... FOR UPDATE sobre el período
         period_row = db.execute(
@@ -582,7 +583,7 @@ def reopen_close(db: Session, period: date, reason: str, user_id: int) -> Close:
     _protect_opening_history(db, normalized_period)
 
     # 1. Bloqueo estricto SELECT ... FOR UPDATE
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     period_row = db.execute(
         select(Period)
         .where(Period.period == normalized_period)

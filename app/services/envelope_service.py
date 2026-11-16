@@ -7,10 +7,11 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import atomic_service, commit_service
 from app.domain.envelopes import (
     EnvelopeMovementItem,
@@ -94,7 +95,7 @@ def get_envelope_balance(
 
 def _lock_envelope(db: Session, envelope_id: int) -> Envelope | None:
     # Mismo orden que cierre/reapertura: bloqueo global antes de cualquier fila.
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     return db.scalar(
         select(Envelope)
         .where(Envelope.id == envelope_id)
@@ -308,7 +309,7 @@ def create_goal(
             )
 
     clean_name = name.strip()
-    db.execute(text("SELECT pg_advisory_xact_lock(170172)"))
+    acquire_advisory_lock(db, 170172, shared=False)
     existing = db.execute(
         select(Envelope).where(func.lower(Envelope.name) == clean_name.lower())
     ).scalar_one_or_none()
@@ -355,7 +356,7 @@ def update_buffer_target(
                 "El monto supera el límite contable máximo permitido (999.999.999.999,99)."
             )
 
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     colchon = db.execute(
         select(Envelope)
         .where(Envelope.name == "Colchón")

@@ -5,10 +5,11 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.transactions import atomic_service, commit_service
 from app.domain.card_import import ColumnMapping, normalize_merchant, parse_statement
 from app.models.auth import User
@@ -59,7 +60,7 @@ def preview_statement(
     expense_positive: bool = True,
 ) -> CardStatement:
     # Todos los escritores adquieren el lock contable antes de bloquear filas.
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     _lock_card(db, account_id)
     if db.get(User, owner_user_id) is None:
         raise ValueError("Titular inválido.")
@@ -161,7 +162,7 @@ def preview_statement(
 def confirm_statement(
     db: Session, statement_id: int, decisions: list[dict[str, Any]], user_id: int
 ) -> CardStatement:
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     account_id = db.scalar(select(CardStatement.account_id).where(CardStatement.id == statement_id))
     if account_id is None:
         raise ValueError("Resumen inexistente.")
