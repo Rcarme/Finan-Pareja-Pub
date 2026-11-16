@@ -146,3 +146,23 @@ def test_setup_token_protection():
         assert _is_setup_token_valid("  secret-installation-token-12345  ") is True
     finally:
         settings.SETUP_TOKEN = original_token
+
+
+def test_setup_rate_limiting():
+    """Verifica que /setup bloquee tras 5 intentos fallidos consecutivos de token."""
+    from app.core.security import (
+        clear_failed_setup_attempts,
+        is_setup_rate_limited,
+        record_failed_setup_attempt,
+    )
+
+    test_ip = "192.168.10.50"
+    clear_failed_setup_attempts(test_ip)
+    assert not is_setup_rate_limited(test_ip)
+
+    for _ in range(5):
+        record_failed_setup_attempt(test_ip)
+
+    assert is_setup_rate_limited(test_ip)
+    clear_failed_setup_attempts(test_ip)
+    assert not is_setup_rate_limited(test_ip)

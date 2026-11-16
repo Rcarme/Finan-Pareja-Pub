@@ -21,8 +21,10 @@ from app.core.config import settings
 # - username -> list[tuple[str, datetime]] (límite distribuido multi-IP contra fuerza bruta masiva)
 FAILED_LOGIN_ATTEMPTS: dict[tuple[str, str], list[datetime]] = {}
 FAILED_USERNAME_ATTEMPTS: dict[str, list[tuple[str, datetime]]] = {}
+FAILED_SETUP_ATTEMPTS: dict[str, list[datetime]] = {}
 MAX_ATTEMPTS = 5
 MAX_GLOBAL_USER_ATTEMPTS = 25
+MAX_SETUP_ATTEMPTS = 5
 MIN_DISTINCT_IPS_FOR_GLOBAL_BLOCK = 3
 WINDOW_MINUTES = 15
 
@@ -202,6 +204,32 @@ def clear_failed_attempts(ip: str, username: str) -> None:
     key = (ip, user_key)
     FAILED_LOGIN_ATTEMPTS.pop(key, None)
     FAILED_USERNAME_ATTEMPTS.pop(user_key, None)
+
+
+def is_setup_rate_limited(ip: str) -> bool:
+    """Verifica si una IP excedió el límite de intentos fallidos en /setup (5 en 15 min)."""
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(minutes=WINDOW_MINUTES)
+    attempts = [t for t in FAILED_SETUP_ATTEMPTS.get(ip, []) if t > cutoff]
+    if attempts:
+        FAILED_SETUP_ATTEMPTS[ip] = attempts
+    else:
+        FAILED_SETUP_ATTEMPTS.pop(ip, None)
+    return len(attempts) >= MAX_SETUP_ATTEMPTS
+
+
+def record_failed_setup_attempt(ip: str) -> None:
+    """Registra un intento fallido de autorización en /setup."""
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(minutes=WINDOW_MINUTES)
+    attempts = [t for t in FAILED_SETUP_ATTEMPTS.get(ip, []) if t > cutoff]
+    attempts.append(now)
+    FAILED_SETUP_ATTEMPTS[ip] = attempts
+
+
+def clear_failed_setup_attempts(ip: str) -> None:
+    """Limpia los intentos de setup tras una inicialización exitosa."""
+    FAILED_SETUP_ATTEMPTS.pop(ip, None)
 
 
 def generate_csrf_token() -> str:

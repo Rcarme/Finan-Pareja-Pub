@@ -37,9 +37,9 @@ El sistema está diseñado específicamente para hogares y parejas con los sigui
 - **Dinero Personal (`OwnershipEntry`):** Asignaciones individuales de cada integrante dentro de cuentas compartidas o particulares.
 - **Sobres Virtuales (`Envelope`):** Reservas etiquetadas dentro del fondo común (Ahorro común, Colchón de emergencia, Compromisos).
 
-### 3.2. Reglas de Redondeo Contable
-- **Transacciones y Operaciones Diarias:** Redondeo estándar `ROUND_HALF_UP` a 2 decimales (`Decimal("0.01")`).
-- **Reparto y Cierres Mensuales:** Redondeo conservador truncado (`ROUND_FLOOR` / `ROUND_DOWN`) para evitar repartir dinero fraccionario inexistente.
+### 3.2. Reglas y Convenciones de Redondeo Contable
+- **Transacciones Diarias, Cotizaciones y Métricas Analíticas:** Se utiliza redondeo aritmético/bancario estándar `ROUND_HALF_UP` a 2 decimales para dinero (`Decimal("0.01")`) y a 4 decimales para cotizaciones cambiarias (`Decimal("0.0001")`).
+- **Liquidación de Cierres Mensuales y Repartos (`settlement.py`, `close_engine.py`, `spending.py`):** Se aplica deliberadamente redondeo conservador truncado hacia abajo (`ROUND_FLOOR` / `ROUND_DOWN`). Esta es una decisión formal de diseño: en ningún caso se deben repartir centavos fraccionarios inexistentes que desbalanceen el fondo real disponible. Cualquier diferencia residual indivisible permanece en el fondo acumulado del hogar.
 
 ### 3.3. Control de Concurrencia (Optimistic Locking)
 Las entidades críticas (`Account`, `Category`, `Transaction`) implementan `OptimisticLockMixin` con una columna `version: int`. Cualquier escritura verifica que la versión esperada coincida; de lo contrario, se rechaza la transacción con `ConcurrencyError`.

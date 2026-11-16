@@ -10,7 +10,15 @@ from app.core.auth import create_session
 from app.core.config import settings
 from app.core.db import get_db
 from app.core.middleware import invalidate_onboarding_cache
-from app.core.security import generate_csrf_token, secure_cookies, validate_csrf
+from app.core.security import (
+    clear_failed_setup_attempts,
+    generate_csrf_token,
+    get_client_ip,
+    is_setup_rate_limited,
+    record_failed_setup_attempt,
+    secure_cookies,
+    validate_csrf,
+)
 from app.services.setup_service import initialize_instance, is_onboarded
 
 setup_router = APIRouter(prefix="/setup", tags=["setup"])
@@ -75,6 +83,22 @@ async def process_setup(
     if is_onboarded(db):
         return RedirectResponse(url="/login", status_code=302)
 
+    client_ip = get_client_ip(request)
+    if is_setup_rate_limited(client_ip):
+        from app.web.app import templates
+
+        return templates.TemplateResponse(
+            request=request,
+            name="setup.html",
+            context={
+                "csrf_token": generate_csrf_token(),
+                "error": "Demasiados intentos fallidos. Por favor, esperá 15 minutos.",
+                "require_setup_token": bool(settings.SETUP_TOKEN),
+                "setup_token": "",
+            },
+            status_code=429,
+        )
+
     if not validate_csrf(request, csrf_token):
         from app.web.app import templates
 
@@ -91,6 +115,7 @@ async def process_setup(
         )
 
     if settings.SETUP_TOKEN and not _is_setup_token_valid(setup_token):
+        record_failed_setup_attempt(client_ip)
         from app.web.app import templates
 
         return templates.TemplateResponse(
@@ -121,6 +146,7 @@ async def process_setup(
             business_name=business_name,
             seed_defaults=seed_defaults,
         )
+        clear_failed_setup_attempts(client_ip)
         invalidate_onboarding_cache()
 
         # Iniciar sesión automáticamente con el usuario 1
