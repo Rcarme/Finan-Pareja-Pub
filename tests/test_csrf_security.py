@@ -99,15 +99,19 @@ def test_csrf_endpoint_rejection_without_token():
 
 def test_all_post_endpoints_require_csrf_or_auth():
     """Verifica programáticamente que ninguna ruta POST se ejecute sin CSRF o autenticación."""
-    from fastapi.routing import APIRoute
+    from app.core.db import get_engine
+    from app.models.base import Base
 
+    Base.metadata.create_all(bind=get_engine())
     client = TestClient(app)
     post_routes: list[str] = []
 
     def _collect_routes(routes):
         for route in routes:
-            if isinstance(route, APIRoute) and "POST" in route.methods:
-                post_routes.append(route.path)
+            methods = getattr(route, "methods", None) or set()
+            path = getattr(route, "path", "")
+            if "POST" in methods and path:
+                post_routes.append(path)
             elif hasattr(route, "routes"):
                 _collect_routes(route.routes)
 
@@ -116,7 +120,7 @@ def test_all_post_endpoints_require_csrf_or_auth():
 
     for path in post_routes:
         # Enviar petición POST sin cookie ni token CSRF ni sesión
-        # Ignorar rutas con parámetros variables como {id}
+        # Ignorar rutas con parámetros variables de URL como {id}
         if "{" in path:
             continue
         resp = client.post(path, data={}, follow_redirects=False)
