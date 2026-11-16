@@ -80,6 +80,48 @@ docker compose up -d
 2. El sistema detectará que es la primera ejecución y te llevará al **Asistente de Bienvenida (`/setup`)**.
 3. Ingresen los nombres de usuario y contraseñas de la pareja, elijan su moneda local y ¡listo! Ya pueden comenzar a registrar sus finanzas.
 
+#### 🧪 Carga Rápida de Datos Demo (Evaluación)
+Si querés probar la aplicación con datos ficticios sin configurar todo manualmente:
+```bash
+python scripts/seed_demo.py
+```
+Esto creará dos usuarios (`alex` / `DemoPassword1234!` y `sam` / `DemoPassword5678!`) con cuentas, categorías y transacciones de muestra.
+
+---
+
+### 🛡️ Despliegue con Reverse Proxy (Caddy / Nginx / Tailscale)
+Para acceder de forma segura desde fuera de tu hogar o desde teléfonos móviles con HTTPS:
+1. Mantené la aplicación vinculada a `127.0.0.1:8088` (`APP_BIND_ADDRESS=127.0.0.1`).
+2. Configurá tu proxy inverso (ej: Caddy o Nginx) para terminar TLS y enviar cabeceras `X-Forwarded-For` y `X-Forwarded-Proto`.
+3. En tu `.env`, asegurate de configurar `FORWARDED_ALLOW_IPS` con la IP del proxy (por defecto `127.0.0.1`).
+4. Si exponés el puerto en una red pública antes del setup, definí `SETUP_TOKEN=tu-clave-secreta` en `.env` para bloquear el asistente inicial contra terceros no autorizados.
+
+#### Ejemplo de Caddyfile
+```caddy
+finanzas.tu-dominio.com {
+    reverse_proxy 127.0.0.1:8088
+}
+```
+
+---
+
+### 📦 Arquitectura de Backups Cifrados (GFS)
+
+```mermaid
+flowchart LR
+    subgraph Host["Servidor / Host"]
+        DB[(PostgreSQL 16)] -->|pg_dumpall| BackupWorker["Worker de Backup"]
+        BackupWorker -->|Cifrado age| EncryptedFile["backup.sql.gz.age"]
+        AgeKey["Clave Pública age"] -.-> BackupWorker
+    end
+    subgraph Storage["Destino Seguro"]
+        EncryptedFile -->|Retención GFS| LocalVolume["Volumen Local /backups"]
+        EncryptedFile -.->|rclone sync| Cloud["Google Drive / S3 / R2"]
+    end
+```
+
+La clave privada de `age` **nunca se almacena en el servidor**, garantizando que incluso ante una vulneración del servidor o del almacenamiento en la nube, los datos financieros no puedan ser leídos por atacantes.
+
 ---
 
 ### 🔑 Cómo Obtener tu API Key Gratuita de Google Gemini

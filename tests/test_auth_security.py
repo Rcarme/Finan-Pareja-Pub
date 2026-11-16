@@ -69,3 +69,24 @@ def test_rate_limiting():
 
     clear_failed_attempts(ip, username)
     assert not is_rate_limited(ip, username)
+
+
+def test_distributed_rate_limiting_by_username():
+    """Verifica que un ataque distribuido (múltiples IPs contra el mismo usuario) sea bloqueado."""
+    username = "victim_user"
+
+    # Limpiar intentos previos
+    clear_failed_attempts("1.1.1.1", username)
+    assert not is_rate_limited("1.1.1.1", username)
+
+    # Simular 10 intentos desde 10 IPs distintas (1 intento por IP)
+    for i in range(10):
+        diff_ip = f"192.168.1.{i + 1}"
+        record_failed_attempt(diff_ip, username)
+
+    # Ahora cualquier IP nueva debe ser bloqueada para este usuario
+    assert is_rate_limited("10.0.0.1", username)
+
+    # Tras un login exitoso, se limpia el bloqueo global
+    clear_failed_attempts("10.0.0.1", username)
+    assert not is_rate_limited("10.0.0.1", username)

@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 from http.cookies import SimpleCookie
 
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
@@ -14,25 +16,44 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.config import settings
 
-# Estructura en memoria para rate limiting: (ip, username) -> list[datetime]
+# Estructura en memoria para rate limiting:
+# - (ip, username) -> list[datetime] (límite específico por IP/usuario)
+# - username -> list[datetime] (límite global por usuario contra ataques distribuidos)
 FAILED_LOGIN_ATTEMPTS: dict[tuple[str, str], list[datetime]] = {}
+FAILED_USERNAME_ATTEMPTS: dict[str, list[datetime]] = {}
 MAX_ATTEMPTS = 5
+MAX_GLOBAL_USER_ATTEMPTS = 10
 WINDOW_MINUTES = 15
 
 
 def _derive_fernet_key(key_material: str | None = None) -> bytes:
-    """Deriva una clave simétrica de 32 bytes en base64 urlsafe para Fernet."""
+    """Deriva una clave de 32 bytes para Fernet mediante HKDF-SHA256 con salt e info."""
     key_str = key_material or settings.APP_SECRET_KEY
     if not key_str:
         if settings.ENVIRONMENT.lower() in {"production", "prod"}:
             raise RuntimeError("APP_SECRET_KEY no configurado en entorno de producción.")
         key_str = "insecure-dev-fallback-key-material-32-chars-min"
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b"finan-pareja-fernet-salt-v1",
+        info=b"finan-pareja-secret-encryption",
+    )
+    derived = hkdf.derive(key_str.encode("utf-8"))
+    return base64.urlsafe_b64encode(derived)
+
+
+def _derive_legacy_sha256_fernet_key(key_material: str | None = None) -> bytes:
+    """Derivación legacy SHA-256 para compatibilidad hacia atrás con secretos v2 previos."""
+    key_str = (
+        key_material or settings.APP_SECRET_KEY or "insecure-dev-fallback-key-material-32-chars-min"
+    )
     digest = hashlib.sha256(key_str.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest)
 
 
 def encrypt_secret(secret_text: str, key_material: str | None = None) -> str:
-    """Cifra un secreto mediante Fernet (AES-128-CBC + HMAC-SHA256 autenticado)."""
+    """Cifra un secreto mediante Fernet (AES-128-CBC + HMAC-SHA256 autenticado con HKDF)."""
     if not secret_text:
         return ""
     f = Fernet(_derive_fernet_key(key_material))
@@ -41,24 +62,35 @@ def encrypt_secret(secret_text: str, key_material: str | None = None) -> str:
 
 
 def decrypt_secret(encrypted_text: str, key_material: str | None = None) -> str:
-    """Descifra un texto cifrado con encrypt_secret, con migración hacia atrás."""
+    """Descifra un texto cifrado con encrypt_secret, con soporte de HKDF, legacy Fernet y XOR."""
     if not encrypted_text or not encrypted_text.startswith("enc:"):
         return encrypted_text
 
-    f = Fernet(_derive_fernet_key(key_material))
+    # 1. Intentar con la clave primaria derivada por HKDF
+    f_primary = Fernet(_derive_fernet_key(key_material))
 
-    # Formato v2 autenticado (Fernet)
     if encrypted_text.startswith("enc:v2:"):
         token = encrypted_text[7:].encode("ascii")
         try:
-            return f.decrypt(token).decode("utf-8")
+            return f_primary.decrypt(token).decode("utf-8")
         except (InvalidToken, ValueError):
-            return ""
+            # Fallback con clave legacy SHA256 directa si fue cifrado antes de migración HKDF
+            try:
+                f_legacy = Fernet(_derive_legacy_sha256_fernet_key(key_material))
+                return f_legacy.decrypt(token).decode("utf-8")
+            except (InvalidToken, ValueError):
+                return ""
 
-    # Formato legacy (intentar Fernet primero, luego fallback XOR para migración transparente)
+    # Formato legacy sin prefijo v2 (intentar Fernet primero, luego fallback XOR transparente)
     raw_payload = encrypted_text[4:]
     try:
-        return f.decrypt(raw_payload.encode("ascii")).decode("utf-8")
+        return f_primary.decrypt(raw_payload.encode("ascii")).decode("utf-8")
+    except (InvalidToken, ValueError):
+        pass
+
+    try:
+        f_legacy = Fernet(_derive_legacy_sha256_fernet_key(key_material))
+        return f_legacy.decrypt(raw_payload.encode("ascii")).decode("utf-8")
     except (InvalidToken, ValueError):
         pass
 
@@ -111,7 +143,7 @@ def protect_response(request: Request, response: Response) -> None:
 
 
 def _purge_expired_attempts(now: datetime) -> None:
-    """Purga todas las entradas vencidas del diccionario de intentos de login (L-05)."""
+    """Purga todas las entradas vencidas de los diccionarios de rate limiting (L-05)."""
     cutoff = now - timedelta(minutes=WINDOW_MINUTES)
     for k in list(FAILED_LOGIN_ATTEMPTS.keys()):
         recent = [t for t in FAILED_LOGIN_ATTEMPTS[k] if t > cutoff]
@@ -120,30 +152,49 @@ def _purge_expired_attempts(now: datetime) -> None:
         else:
             FAILED_LOGIN_ATTEMPTS.pop(k, None)
 
+    for user_key in list(FAILED_USERNAME_ATTEMPTS.keys()):
+        recent_user = [t for t in FAILED_USERNAME_ATTEMPTS[user_key] if t > cutoff]
+        if recent_user:
+            FAILED_USERNAME_ATTEMPTS[user_key] = recent_user
+        else:
+            FAILED_USERNAME_ATTEMPTS.pop(user_key, None)
+
 
 def is_rate_limited(ip: str, username: str) -> bool:
-    """Verifica si un usuario/IP excedió el límite de intentos fallidos (5 en 15 min)."""
-    key = (ip, username.lower().strip())
+    """Verifica si un usuario/IP excedió el límite de intentos por IP o global por usuario."""
+    user_key = username.lower().strip()
+    key = (ip, user_key)
     now = datetime.now(UTC)
     _purge_expired_attempts(now)
-    recent_attempts = FAILED_LOGIN_ATTEMPTS.get(key, [])
-    return len(recent_attempts) >= MAX_ATTEMPTS
+    recent_ip_user = FAILED_LOGIN_ATTEMPTS.get(key, [])
+    if len(recent_ip_user) >= MAX_ATTEMPTS:
+        return True
+    recent_global_user = FAILED_USERNAME_ATTEMPTS.get(user_key, [])
+    return len(recent_global_user) >= MAX_GLOBAL_USER_ATTEMPTS
 
 
 def record_failed_attempt(ip: str, username: str) -> None:
-    """Registra un intento de login fallido."""
-    key = (ip, username.lower().strip())
+    """Registra un intento de login fallido tanto por IP+usuario como global por usuario."""
+    user_key = username.lower().strip()
+    key = (ip, user_key)
     now = datetime.now(UTC)
     _purge_expired_attempts(now)
+
     recent_attempts = FAILED_LOGIN_ATTEMPTS.get(key, [])
     recent_attempts.append(now)
     FAILED_LOGIN_ATTEMPTS[key] = recent_attempts
 
+    recent_user_attempts = FAILED_USERNAME_ATTEMPTS.get(user_key, [])
+    recent_user_attempts.append(now)
+    FAILED_USERNAME_ATTEMPTS[user_key] = recent_user_attempts
+
 
 def clear_failed_attempts(ip: str, username: str) -> None:
     """Limpia los intentos fallidos tras un login exitoso."""
-    key = (ip, username.lower().strip())
+    user_key = username.lower().strip()
+    key = (ip, user_key)
     FAILED_LOGIN_ATTEMPTS.pop(key, None)
+    FAILED_USERNAME_ATTEMPTS.pop(user_key, None)
 
 
 def generate_csrf_token() -> str:
