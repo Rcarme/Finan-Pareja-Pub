@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.card-import { max-width: 48rem; }
+.card-import label { display: block; margin-top: .8rem; margin-bottom: .35rem; }
+.card-import input:not([type="checkbox"]), .card-import select { display: block; width: 100%; box-sizing: border-box; min-height: 44px; padding: .65rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface, white); color: var(--text); font: inherit; }
+.card-import input[type="checkbox"] { width: 24px; height: 24px; vertical-align: middle; margin-right: .4rem; }
+.card-import label:has(input[type="checkbox"]) { min-height: 44px; display: flex; align-items: center; }
+.card-import fieldset { border: 1px solid var(--border); border-radius: .65rem; }
+.card-import legend { overflow-wrap: anywhere; max-width: 100%; }
+.card-import button { margin-top: 1rem; min-height: 44px; }
+</style>
+<h1>Tarjetas y resúmenes</h1>
+<p>Importá el archivo CSV del resumen de tu tarjeta (Visa, Mastercard, Amex). Revisá cada consumo antes de contabilizar. Los archivos originales se descartan; no enviamos datos a servicios de IA.</p>
+{% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+{% if statement %}
+<h2>Revisión del resumen #{{ statement.id }}</h2>
+<p>Para <a href="/transactions/new">registrar el pago de la tarjeta</a>, elegí Transferencia desde la cuenta que paga hacia la tarjeta. Los consumos ya contabilizados no vuelven a generar gastos.</p>
+<form class="card-import" method="post" action="/cards/{{ statement.id }}/confirm">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+{% include "_category_visibility.html" %}
+{% for row in statement.rows %}{% set i = loop.index0 %}
+<fieldset style="margin-bottom:1rem;padding:1rem;min-width:0">
+<legend>{{ loop.index }}. {{ row.merchant }}</legend>
+<p>{{ row.date }} · {{ row.currency }} {{ row.amount }} {% if row.remaining_installments %}· {{ row.remaining_installments }} cuotas futuras estimadas{% endif %}</p>
+{% if row.possible_duplicate %}<p role="status">Posible repetición de otro resumen: corroborá el consumo. No se elimina automáticamente.</p>{% endif %}
+{% if row.suggested %}<p>Categoría y atribución sugeridas por una regla de esta tarjeta. Corroboralas.</p>{% endif %}
+{% if row.transaction_id %}
+<p>Ya contabilizado: movimiento #{{ row.transaction_id }}.</p>
+{% else %}
+<label><input type="checkbox" name="selected_{{ i }}" value="yes"> Contabilizar este consumo</label>
+<label for="date_{{ i }}">Fecha del consumo</label><input id="date_{{ i }}" name="date_{{ i }}" type="date" value="{{ row.date }}">
+<label for="period_{{ i }}">Período contable (elegí una fecha del mes abierto)</label><input id="period_{{ i }}" name="period_{{ i }}" type="date" value="{{ row.date }}">
+<label for="kind_{{ i }}">Tipo</label><select id="kind_{{ i }}" name="kind_{{ i }}"><option value="expense" {% if row.kind == 'expense' %}selected{% endif %}>Gasto</option><option value="income" {% if row.kind == 'income' %}selected{% endif %}>Reintegro</option></select>
+<label for="amount_{{ i }}">Importe en {{ row.currency }} </label><input id="amount_{{ i }}" name="amount_{{ i }}" value="{{ row.amount }}" type="number" step="0.01" min="0.01" inputmode="decimal">
+{% if row.currency == 'USD' %}<label for="ars_{{ i }}">Importe real liquidado en pesos </label><input id="ars_{{ i }}" name="ars_{{ i }}" type="number" step="0.01" min="0.01" inputmode="decimal"><p>Sin liquidación real, dejalo pendiente. El dólar de referencia no contabiliza este gasto.</p>{% endif %}
+<label for="category_{{ i }}">Categoría</label><select id="category_{{ i }}" name="category_{{ i }}"><option value="">Elegí una categoría</option>{% for category in categories %}<option value="{{ category.id }}" data-category-owner="{{ category.owner_user_id or '' }}" {% if row.category_id == category.id or (canonical_categories|default({})).get(row.category_id, {}).id == category.id %}selected{% endif %}>{{ category.name }} ({{ 'gasto' if category.kind == 'expense' else 'ingreso' }})</option>{% endfor %}</select>
+<label for="charged_{{ i }}">A quién corresponde</label><select id="charged_{{ i }}" name="charged_{{ i }}"><option value="">Común</option>{% for user in users %}<option value="{{ user.id }}" {% if row.charged_to_user_id == user.id %}selected{% endif %}>{{ user.display_name }}</option>{% endfor %}</select>
+<label><input type="checkbox" name="learn_{{ i }}" value="yes"> Recordar categoría y atribución para este comercio en esta tarjeta</label>
+{% endif %}
+</fieldset>
+{% endfor %}
+<button class="btn btn-primary" type="submit">Confirmar consumos seleccionados</button>
+</form>
+{% else %}
+<p>Primero creá una cuenta de tipo tarjeta por cada Visa/Amex y titular en <a href="/settings">Configuración</a>. Una misma tarjeta admite gastos comunes y personales.</p>
+<form class="card-import" method="post" action="/cards/preview" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label for="account">Tarjeta</label><select id="account" name="account_id" required>{% for account in accounts %}<option value="{{ account.id }}">{{ account.name }}</option>{% endfor %}</select>
+<label for="owner">Titular</label><select id="owner" name="owner_user_id" required>{% for user in users %}<option value="{{ user.id }}">{{ user.display_name }}</option>{% endfor %}</select>
+<label for="file">Resumen CSV (máximo 2 MB)</label><input id="file" type="file" name="file" accept=".csv,text/csv" required>
+<p>Copiá los nombres exactos de las columnas que aparecen en la primera fila del CSV.</p>
+{% for field, label in [('date','Fecha'),('merchant','Comercio o descripción'),('amount','Importe'),('currency','Moneda (opcional; vacío = ARS)'),('installments','Cuotas actual/total (opcional)')] %}<label for="{{ field }}">{{ label }}</label><input id="{{ field }}" name="{{ field }}_column" {% if field in ['date','merchant','amount'] %}required{% endif %}>{% endfor %}
+<label for="delimiter">Separador de columnas</label><select id="delimiter" name="delimiter"><option value=";">Punto y coma</option><option value=",">Coma</option></select>
+<label for="decimal">Separador decimal</label><select id="decimal" name="decimal_separator"><option value=",">Coma</option><option value=".">Punto</option></select>
+<label for="dateformat">Formato de fecha</label><select id="dateformat" name="date_format"><option value="%d/%m/%Y">DD/MM/AAAA</option><option value="%Y-%m-%d">AAAA-MM-DD</option></select>
+<label for="encoding">Codificación</label><select id="encoding" name="encoding"><option value="utf-8-sig">UTF-8</option><option value="cp1252">Windows / Excel</option></select>
+<label for="sign">Signo de los gastos</label><select id="sign" name="expense_positive"><option value="yes">Positivo</option><option value="no">Negativo</option></select>
+<button class="btn btn-primary" type="submit">Ver y revisar consumos</button>
+</form>
+<h2>Resúmenes recientes</h2><ul>{% for item in statements %}<li><a href="/cards/{{ item.id }}">Resumen #{{ item.id }} · {{ item.created_at|date }}</a></li>{% else %}<li>Todavía no hay resúmenes.</li>{% endfor %}</ul>
+{% endif %}
+<script nonce="{{ csp_nonce(request) }}" src="/static/js/category_visibility.js"></script>
+{% endblock %}
+
+

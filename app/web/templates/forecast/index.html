@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% macro amount(value) -%}
+{% if value is none %}Sin estimar en pesos{% else %}{{ value | currency }}{% endif %}
+{%- endmacro %}
+
+{% block head %}
+<style nonce="{{ csp_nonce(request) }}">
+    .forecast-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+    .forecast-grid div { overflow-wrap: anywhere; }
+    .forecast-grid dt { color: var(--text-muted); font-size: 0.8rem; }
+    .forecast-grid dd { font-weight: 600; }
+    .forecast-entry { margin: 0.5rem 0; overflow-wrap: anywhere; }
+    summary { min-height: 44px; cursor: pointer; display: flex; align-items: center; }
+    .forecast-note { color: var(--text-muted); font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 style="font-size: 1.4rem; margin-bottom: 1rem;">Proyección de los próximos 12 meses</h1>
+<div class="card">
+    <p>Los movimientos registrados y las estimaciones se muestran por separado. Esta vista no modifica tus saldos.</p>
+    {% if report.fx_rate %}
+    <p style="margin-top: 0.75rem;">Dólar de referencia: <strong>{{ report.fx_rate.rate | currency }}</strong> por USD.<br>
+        Fecha: {{ report.fx_rate.published_at | date if report.fx_rate.published_at else report.fx_rate.date | date }} · {{ report.fx_rate.source }}.</p>
+    {% else %}
+    <p class="alert alert-warning" style="margin-top: 0.75rem;">Todavía no hay una cotización disponible. Los compromisos en USD se conservan sin convertir y los totales afectados quedan sin estimar en pesos.</p>
+    {% endif %}
+    <ul style="padding-left: 1.25rem; margin-top: 0.75rem;" class="forecast-note">
+        {% for limitation in report.limitations %}<li>{{ limitation }}</li>{% endfor %}
+    </ul>
+</div>
+
+{% for month in report.months %}
+<article class="card">
+    <h2 style="font-size: 1.1rem;">{{ month.period.strftime('%m/%Y') }}</h2>
+    <dl class="forecast-grid">
+        <div><dt>Ingresos registrados</dt><dd>{{ amount(month.registered_income) }}</dd></div>
+        <div><dt>Gastos registrados</dt><dd>{{ amount(month.registered_expense) }}</dd></div>
+        <div><dt>Ingresos pendientes estimados</dt><dd>{{ amount(month.estimated_income) }}</dd></div>
+        <div><dt>Gastos pendientes estimados</dt><dd>{{ amount(month.estimated_expense) }}</dd></div>
+    </dl>
+    {% if month.unconverted_usd > 0 %}
+    <p class="alert alert-warning">Compromisos sin convertir: USD {{ month.unconverted_usd | decimal_ar }}.</p>
+    {% endif %}
+    <details>
+        <summary>Ver {{ month.entries | length }} conceptos</summary>
+        {% for entry in month.entries %}
+        <p class="forecast-entry">
+            <strong>{{ entry.label }}</strong><br>
+            {{ 'Ingreso' if entry.kind == 'income' else 'Gasto' }} · {{ 'Estimado' if entry.estimated else 'Registrado' }} ·
+            {% if entry.currency == 'USD' %}USD {{ entry.amount | decimal_ar }}{% else %}{{ entry.amount | currency }}{% endif %}
+        </p>
+        {% else %}
+        <p class="forecast-note">No hay conceptos conocidos para este mes.</p>
+        {% endfor %}
+    </details>
+</article>
+{% endfor %}
+{% endblock %}

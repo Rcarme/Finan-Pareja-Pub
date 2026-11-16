@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 1rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 700;">Conciliación de Cuentas</h2>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+        Compará el saldo del sistema contra el saldo real (extracto bancario o efectivo). Si difieren, se generará un movimiento de ajuste auditado (RN-19).
+    </p>
+</div>
+
+{% if success_msg %}
+<div class="alert alert-success">{{ success_msg }}</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div style="display: flex; flex-direction: column; gap: 1rem;">
+    {% for acc in accounts %}
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3 style="font-size: 1.1rem; font-weight: 600;">{{ acc.name }}</h3>
+                <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: capitalize;">
+                    {% if acc.type == 'bank' %}Banco{% elif acc.type == 'cash' %}Efectivo{% elif acc.type == 'credit' %}Tarjeta de crédito{% else %}Billetera virtual{% endif %}
+                </span>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Saldo en sistema</span>
+                <span style="font-size: 1.15rem; font-weight: 700; color: var(--primary);">{% if acc.currency == 'USD' %}USD {{ acc.balance | decimal_ar }}{% else %}{{ acc.balance | currency }}{% endif %}</span>
+            </div>
+        </div>
+
+        {% if acc.currency == 'ARS' %}
+        <form method="POST" action="/reconciliation" style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <input type="hidden" name="account_id" value="{{ acc.id }}">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <div>
+                    <label class="form-label" style="font-size: 0.75rem;">Saldo Real ($)</label>
+                    <input 
+                        type="text" 
+                        name="real_balance" 
+                        inputmode="decimal" 
+                        placeholder="0,00" 
+                        required 
+                        class="form-control" 
+                        style="min-height: 40px; font-weight: 600; text-align: right;"
+                    >
+                </div>
+                <div>
+                    <label class="form-label" style="font-size: 0.75rem;">Mes de imputación</label>
+                    <input 
+                        type="month" 
+                        name="period" 
+                        value="{{ current_period }}" 
+                        required 
+                        class="form-control" 
+                        style="min-height: 40px;"
+                    >
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%;">
+                Conciliar esta cuenta
+            </button>
+        </form>
+        {% else %}
+        <p>Saldo nativo en USD. No se concilia con un ajuste en pesos.</p>
+        <p>Para revisar la foto inicial o registrar una corrección auditada, usá <a href="/settings/ownership">Apertura del dinero</a>. Si vendiste ahorro en dólares, registrá allí la conversión real.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

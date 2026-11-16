@@ -1,0 +1,79 @@
+{% extends "simple/base.html" %}
+{% block content %}
+<div class="screen-title" style="margin-bottom: 1rem;">
+    <h1>Cierres de Mes 📊</h1>
+    <a href="/close" class="secondary-button" style="font-size: .85rem; padding: .4rem .8rem;">Modo escritorio</a>
+</div>
+
+{% if is_closed %}
+<section class="success-card" style="margin-bottom: 1.25rem;">
+    <div>
+        <strong>Período {{ period.strftime("%B %Y") | capitalize }} cerrado</strong>
+        <p class="muted" style="margin: .2rem 0 0; font-size: .85rem;">La liquidación ya fue formalmente registrada e inmutable.</p>
+    </div>
+</section>
+{% elif preview %}
+<section class="balance-card" style="margin-bottom: 1.25rem;">
+    <span class="muted">Período en curso · {{ period.strftime("%B %Y") | capitalize }}</span>
+    <strong class="{% if not preview.is_deficit %}income{% else %}muted{% endif %}">
+        {{ preview.available | currency }}
+    </strong>
+    <p class="muted" style="margin-top: .4rem; font-size: .85rem;">
+        Fondo común disponible para liquidar
+    </p>
+</section>
+
+<section class="simple-card">
+    <h2>Liquidación y Distribución</h2>
+    <div class="detail-values">
+        <div>
+            <dt>Excedente generado</dt>
+            <dd><strong>{{ preview.excedent | currency }}</strong></dd>
+        </div>
+        <div>
+            <dt>Reserva para Colchón (20%)</dt>
+            <dd style="color: var(--accent);">{{ preview.buffer | currency }}</dd>
+        </div>
+        <div>
+            <dt>Reserva para Ahorro (30%)</dt>
+            <dd style="color: #86efac;">{{ preview.savings | currency }}</dd>
+        </div>
+        <div>
+            <dt>Total a Distribuir (50%)</dt>
+            <dd style="color: #38bdf8;"><strong>{{ preview.distributable | currency }}</strong></dd>
+        </div>
+        <div style="border-top: 1px solid var(--border); margin-top: .5rem; padding-top: .5rem;">
+            <dt>Distribución a Integrante 1</dt>
+            <dd><strong>{{ preview.distribution_a | currency }}</strong></dd>
+        </div>
+        <div>
+            <dt>Distribución a Integrante 2</dt>
+            <dd><strong>{{ preview.distribution_b | currency }}</strong></dd>
+        </div>
+    </div>
+
+    <a href="/close" class="primary-button wide" style="margin-top: 1.25rem; text-align: center; text-decoration: none;">
+        Ir al Asistente de Cierre Formal
+    </a>
+</section>
+{% else %}
+<section class="simple-card">
+    <p class="muted">No hay liquidación preliminar calculada para este período.</p>
+</section>
+{% endif %}
+
+<section class="simple-card">
+    <h2>Historial de cierres anteriores</h2>
+    {% for c in recent_closes %}
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: .65rem 0; border-top: {% if not loop.first %}1px solid var(--border){% else %}none{% endif %};">
+        <div>
+            <strong>{{ c.period.strftime("%B %Y") | capitalize }}</strong>
+            <span class="muted" style="display: block; font-size: .8rem;">Cerrado el {{ c.created_at.strftime("%d/%m/%Y") }}</span>
+        </div>
+        <a href="/close/{{ c.period.isoformat() }}" class="text-link" style="font-size: .85rem;">Ver detalle</a>
+    </div>
+    {% else %}
+    <p class="muted empty">Aún no hay períodos cerrados en el historial.</p>
+    {% endfor %}
+</section>
+{% endblock %}

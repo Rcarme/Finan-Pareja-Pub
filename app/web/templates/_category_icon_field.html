@@ -1,0 +1,19 @@
+<label class="form-label" for="icon_{{ category.id }}">Icono</label>
+<div class="icon-input-row">
+    <input class="form-control" id="icon_{{ category.id }}" name="icon" type="text" value="{{ category.icon }}" list="icon_options_{{ category.id }}" aria-describedby="icon_help_{{ category.id }}" required autocomplete="off" spellcheck="false">
+    <button type="button" class="secondary-button emoji-clear-btn" data-icon-clear="icon_{{ category.id }}" title="Borrar para escribir cualquier emoji desde tu teclado">Usar teclado 📱</button>
+</div>
+<div class="emoji-picker-grid" role="group" aria-label="Selector rápido de emojis para {{ category.name }}">
+    {% for value, label in recommended_emojis.items() %}
+    <button type="button" class="emoji-chip" data-icon-target="icon_{{ category.id }}" data-icon-value="{{ value }}" title="{{ label }}" aria-label="{{ label }} ({{ value }})" {% if category.icon == value %}aria-pressed="true"{% else %}aria-pressed="false"{% endif %}>{{ value }}</button>
+    {% endfor %}
+</div>
+<datalist id="icon_options_{{ category.id }}">
+    {% for value, label in recommended_emojis.items() %}
+    <option value="{{ value }}">{{ label }}</option>
+    {% endfor %}
+    {% for value, label in svg_icons.items() %}
+    <option value="{{ value }}">{{ label }} (SVG)</option>
+    {% endfor %}
+</datalist>
+<p class="muted category-icon-help" id="icon_help_{{ category.id }}">Tocá un emoji de la galería o tocá «Usar teclado 📱» para escribir cualquiera de los más de 3.700 emojis de tu teclado.</p>

@@ -1,0 +1,10 @@
+{% for transaction in transactions %}
+{% set category = categories.get(transaction.category_id) %}
+{% set account = accounts.get(transaction.account_id) if accounts else None %}
+{% set to_account = accounts.get(transaction.to_account_id) if (accounts and transaction.to_account_id) else None %}
+<a class="transaction-row" href="/s/{{ transaction.id }}">
+{% if category %}{% include "simple/_icon.html" %}{% else %}<span class="category-icon" aria-hidden="true">↔</span>{% endif %}
+<span class="transaction-description"><strong>{{ category_label(category.name) if category else ('Transferencia' if transaction.kind == 'transfer' else 'Retiro') }}</strong><span>{{ transaction.description }}</span><small>{% if account %}{{ account.name }}{% if to_account %} → {{ to_account.name }}{% endif %}{% endif %}{% if show_date|default(false) and account %} · {% endif %}{% if show_date|default(false) or not account %}{{ transaction.date|date }}{% endif %}{% if transaction.status == 'voided' %} · Anulado{% endif %}</small></span>
+<strong class="amount {{ 'income' if transaction.kind == 'income' else '' }}">{{ '+' if transaction.kind == 'income' else '−' if transaction.kind in ['expense','distribution'] else '' }}{{ transaction.amount|currency }}</strong>
+</a>
+{% else %}<p class="muted empty">Todavía no hay operaciones en este período.</p>{% endfor %}

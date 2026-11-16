@@ -1,0 +1,104 @@
+services:
+  app:
+    build: .
+    container_name: finan_app
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${APP_TIMEZONE:-America/Argentina/Buenos_Aires}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?Definí APP_SECRET_KEY en el archivo .env}
+      DATABASE_URL: ${DATABASE_URL:?Definí DATABASE_URL con rol finanzas_app en el archivo .env}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Argentina/Buenos_Aires}
+      DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-ARS}
+      FX_AUTOMATIC_ENABLED: ${FX_AUTOMATIC_ENABLED:-true}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_HOST_PORT:-8088}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:16-alpine
+    container_name: finan_db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${APP_TIMEZONE:-America/Argentina/Buenos_Aires}
+      POSTGRES_DB: ${POSTGRES_DB:-finanzas}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-finanzas_bootstrap}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Definí POSTGRES_ADMIN_PASSWORD en el archivo .env}
+      POSTGRES_OWNER_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Definí POSTGRES_OWNER_PASSWORD en el archivo .env}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Definí POSTGRES_APP_PASSWORD en el archivo .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./ops/db_init/10_roles.sh:/docker-entrypoint-initdb.d/10_roles.sh:ro
+      - ./ops/db_roles.sql:/opt/finanzas/db_roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-finanzas}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backup:
+    build: .
+    container_name: finan_backup
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${APP_TIMEZONE:-America/Argentina/Buenos_Aires}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?Definí APP_SECRET_KEY en el archivo .env}
+      DATABASE_URL: ${BACKUP_DATABASE_URL:?Definí BACKUP_DATABASE_URL con rol finanzas_app en el archivo .env}
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-finanzas}
+      POSTGRES_USER: finanzas_app
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?Definí POSTGRES_APP_PASSWORD en el archivo .env}
+      RCLONE_CONFIG: /etc/rclone/rclone.conf
+      AGE_PUBLIC_KEY: ${AGE_PUBLIC_KEY:-}
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive:finanzas_backups}
+      BACKUP_TASK_TIMEOUT_SECONDS: ${BACKUP_TASK_TIMEOUT_SECONDS:-7200}
+      BACKUP_VERIFY_RETRY_SECONDS: ${BACKUP_VERIFY_RETRY_SECONDS:-3600}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backups_data:/backups
+      - ./ops/backup:/app/ops/backup:ro
+      - ./ops/rclone-config:/etc/rclone:ro
+    entrypoint: ["/bin/bash", "/app/ops/backup/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "/bin/bash", "/app/ops/backup/healthcheck.sh"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  migrate:
+    profiles: ["tools"]
+    build: .
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?Definí APP_SECRET_KEY}
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?Definí MIGRATION_DATABASE_URL solo para migrar}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?Definí MIGRATION_DATABASE_URL solo para migrar}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+
+volumes:
+  pgdata:
+  backups_data:

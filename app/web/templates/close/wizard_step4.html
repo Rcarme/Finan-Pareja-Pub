@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style nonce="{{ csp_nonce(request) }}">
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    .step-indicator::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--card-border);
+        z-index: 1;
+        transform: translateY(-50%);
+    }
+    .step-badge {
+        position: relative;
+        z-index: 2;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        background-color: var(--card-bg);
+        border: 2px solid var(--card-border);
+        color: var(--text-muted);
+    }
+    .step-badge.active {
+        border-color: var(--primary);
+        color: var(--primary);
+        background-color: rgba(56, 189, 248, 0.15);
+    }
+    .step-badge.completed {
+        border-color: var(--success);
+        color: var(--success);
+        background-color: var(--success-bg);
+    }
+    .step-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-color);
+        margin-bottom: 0.5rem;
+    }
+    .calc-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+    .calc-table td {
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.9rem;
+    }
+    .calc-table tr:last-child td {
+        border-bottom: none;
+    }
+    .user-share-card {
+        background-color: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 0.85rem;
+        margin-bottom: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">
+            🏁 Cierre de Mes ({{ period_display }})
+        </h2>
+        <a href="/close/history" class="btn btn-outline btn-sm">Historial</a>
+    </div>
+
+    <!-- Indicador de pasos -->
+    <div class="step-indicator">
+        <div class="step-badge completed">✓</div>
+        <div class="step-badge completed">✓</div>
+        <div class="step-badge completed">✓</div>
+        <div class="step-badge active" title="Paso 4: Confirmar">4</div>
+    </div>
+
+    <div class="step-title">Paso 4: Vista Previa y Confirmación</div>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem;">
+        Revisá el reparto configurado y los destinos. Al confirmar se registran las asignaciones y retiros y se cierra el período (RN-22, RN-24).
+    </p>
+
+    {% for warning in preview.warnings %}
+    <div class="alert alert-warning" role="status">{{ warning }}</div>
+    {% endfor %}
+
+    <!-- Resumen del cálculo -->
+    <div style="background-color: rgba(30, 41, 59, 0.5); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1.25rem;">
+        <table class="calc-table">
+            <tr>
+                <td style="color: var(--text-muted);">Disponible acumulado (D)</td>
+                <td style="text-align: right; font-weight: 700;">{{ result.available | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Reserva de refuerzos (R)</td>
+                <td style="text-align: right; font-weight: 700; color: var(--warning);">- {{ result.reinforcement_reservation | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Base de reparto (D − R)</td>
+                <td style="text-align: right; font-weight: 700;">{{ result.base | currency }}</td>
+            </tr>
+            <tr style="background-color: rgba(56, 189, 248, 0.05);">
+                <td><strong>Excedente a aplicar (E)</strong></td>
+                <td style="text-align: right; font-weight: 800; color: var(--primary);">{{ result.excedent | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Aporte Colchón ({{ split_config.buffer_pct }}%)</td>
+                <td style="text-align: right; font-weight: 700; color: var(--primary);">{{ result.buffer_allocation | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Aporte Ahorro común ({{ split_config.savings_pct }}%)</td>
+                <td style="text-align: right; font-weight: 700; color: var(--success);">{{ result.savings_allocation | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Total a repartir ({{ split_config.distribution_pct }}%), mitad para cada uno</td>
+                <td style="text-align: right; font-weight: 700;">{{ result.distributable | currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-muted);">Retenido en el fondo (centavo impar)</td>
+                <td style="text-align: right; font-weight: 600; color: var(--text-muted);">{{ result.retained | currency }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Retiros por persona -->
+    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-color); margin-bottom: 0.75rem;">
+        👥 Retiros individuales por beneficiario
+    </h3>
+
+    {% if users | length >= 2 %}
+    {% set u0 = users[0] %}
+    {% set u1 = users[1] %}
+    <div class="user-share-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <strong style="color: var(--primary); font-size: 0.95rem;">{{ u0.display_name }}</strong>
+            <span style="font-size: 1.15rem; font-weight: 800; color: var(--success);">
+                {{ result.distribution_user_a | currency }}
+            </span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+            <span>Parte teórica: {{ result.share_each | currency }}</span>
+            {% if result.total_charges_a > 0 %}
+            <span style="color: var(--danger);">Cargos: -{{ result.total_charges_a | currency }}</span>
+            {% endif %}
+            {% if result.new_carryover_user_a > 0 %}
+            <span style="color: var(--danger); font-weight: 600;">Nuevo arrastre: {{ result.new_carryover_user_a | currency }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="user-share-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <strong style="color: var(--primary); font-size: 0.95rem;">{{ u1.display_name }}</strong>
+            <span style="font-size: 1.15rem; font-weight: 800; color: var(--success);">
+                {{ result.distribution_user_b | currency }}
+            </span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+            <span>Parte teórica: {{ result.share_each | currency }}</span>
+            {% if result.total_charges_b > 0 %}
+            <span style="color: var(--danger);">Cargos: -{{ result.total_charges_b | currency }}</span>
+            {% endif %}
+            {% if result.new_carryover_user_b > 0 %}
+            <span style="color: var(--danger); font-weight: 600;">Nuevo arrastre: {{ result.new_carryover_user_b | currency }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Formulario de confirmación y ejecución -->
+    {% if savings_destinations %}
+    <h3>Destinos elegidos para el ahorro</h3>
+    <ul>
+        {% for envelope_id, amount in savings_destinations.items() %}
+        <li>{{ selected_envelopes[envelope_id].name }}: {{ amount | currency }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>El ahorro se asignará al sobre Ahorro común.</p>
+    {% endif %}
+
+    <form method="post" action="/close/execute" class="js-confirm-submit" data-confirm="¿Cerrar {{ period_display }}? Se registrarán asignaciones y retiros. Para modificarlo después tendrás que reabrir formalmente el período." style="margin-top: 1.5rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+        <input type="hidden" name="period" value="{{ period_str }}">
+        <input type="hidden" name="reinforcement_reservation" value="{{ reinforcement_reservation | decimal_ar }}">
+
+        {% for u in users %}
+        {% set req_acc = request.query_params.get('dest_account_' ~ u.id) %}
+        <input type="hidden" name="dest_account_{{ u.id }}" value="{{ req_acc if req_acc else accounts[0].id }}">
+        {% endfor %}
+
+        {% for envelope_id, amount in savings_destinations.items() %}
+        <input type="hidden" name="savings_dest_{{ envelope_id }}" value="{{ amount | decimal_ar }}">
+        {% endfor %}
+
+        <div style="display: flex; justify-content: space-between; gap: 0.75rem;">
+            <a href="{{ back_url }}" class="btn btn-secondary" style="flex: 1; text-align: center; text-decoration: none;">
+                ← Paso 3
+            </a>
+            <button type="submit" class="btn btn-success" style="flex: 2; font-weight: 700; min-height: 44px;">
+                🚀 Confirmar y Cerrar Período
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

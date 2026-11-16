@@ -1,0 +1,20 @@
+.settings-action { width: 100%; margin-top: .75rem; }
+.settings-appearance { border-top: 1px solid var(--border); padding: .4rem 0; }
+.settings-summary { min-height: 44px; display: flex; align-items: center; gap: .6rem; cursor: pointer; }
+.settings-appearance-form { padding: .75rem 0; }
+.category-icon { width: 24px; height: 24px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.category-emoji { display: inline-flex; align-items: center; justify-content: center; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 24px; line-height: 1; }
+.category-icon-help { font-size: .85rem; }
+.color-blue { color: #38bdf8; }.color-green { color: #22c55e; }.color-amber { color: #f59e0b; }.color-rose { color: #fb7185; }.color-violet { color: #a78bfa; }.color-teal { color: #2dd4bf; }.color-slate { color: #94a3b8; }
+
+.category-visibility { display: flex; align-items: center; gap: .6rem; min-height: 44px; }
+.category-visibility input { width: auto; }
+.category-merge-options { display: flex; flex-direction: column; gap: .6rem; max-height: 320px; overflow-y: auto; margin-top: 1rem; }
+.category-merge-options label { min-height: 44px; display: flex; align-items: center; gap: .6rem; }
+
+.icon-input-row { display: flex; gap: .5rem; align-items: center; }
+.icon-input-row input { flex: 1; min-width: 0; }
+.emoji-clear-btn { min-height: 44px; padding: .4rem .75rem; font-size: .82rem; white-space: nowrap; flex-shrink: 0; border-radius: .5rem; border: 1px solid var(--border); background: var(--surface, #1e293b); color: var(--text, #f8fafc); }
+.emoji-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: .35rem; max-height: 210px; overflow-y: auto; margin-top: .5rem; padding: .4rem; border: 1px solid var(--border); border-radius: .6rem; background: rgba(15, 23, 42, 0.5); }
+.emoji-chip { min-height: 44px; min-width: 44px; border: 1px solid var(--border); border-radius: .5rem; background: rgba(255, 255, 255, 0.03); font-size: 1.3rem; display: grid; place-items: center; padding: 0; cursor: pointer; }
+.emoji-chip[aria-pressed="true"] { border-color: var(--primary, #38bdf8); background: rgba(56, 189, 248, 0.2); }

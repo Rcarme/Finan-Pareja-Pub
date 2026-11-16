@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="/static/js/chart.umd.min.js"></script>
+<style nonce="{{ csp_nonce(request) }}">
+    .report-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .report-note { color: var(--text-muted); font-size: 0.9rem; }
+    .adjustment-list { list-style: none; padding: 0; }
+    .adjustment-list li { border-bottom: 1px solid var(--border); padding: 0.75rem 0; overflow-wrap: anywhere; }
+    .adjustment-list a { display: inline-flex; align-items: center; min-height: 44px; color: var(--primary); }
+    .adjustment-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .adjustment-totals { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .report-grid > * { min-width: 0; }
+    .accessible-table { overflow-wrap: anywhere; }
+    @media (max-width: 480px) {
+        .accessible-table th, .accessible-table td { padding: 0.3rem 0.2rem; font-size: 0.75rem; }
+    }
+    @media (min-width: 640px) {
+        .report-grid-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    .metric-card {
+        background-color: var(--input-bg);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        text-align: center;
+    }
+    .metric-title {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    .metric-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+    }
+    .chart-container {
+        position: relative;
+        width: 100%;
+        max-height: 280px;
+        margin: 1rem 0;
+    }
+    .accessible-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+    .accessible-table th, .accessible-table td {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+    }
+    .accessible-table th.num, .accessible-table td.num {
+        text-align: right;
+    }
+    .progress-bar-bg {
+        background-color: var(--input-bg);
+        border-radius: 9999px;
+        height: 8px;
+        width: 100%;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        background-color: var(--primary);
+        height: 100%;
+        border-radius: 9999px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 1.5rem; font-weight: 700;">📊 Reportes y Estadísticas</h1>
+    
+    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <!-- Selector de período -->
+        <form method="get" action="/reports" style="display: flex; gap: 0.5rem; align-items: center;">
+            <select name="period" class="form-input js-auto-submit" style="padding: 0.4rem 0.6rem; font-size: 0.85rem; min-height: 44px;">
+                {% for p in available_periods %}
+                <option value="{{ p.strftime('%Y-%m-01') }}" {% if p.year == current_period.year and p.month == current_period.month %}selected{% endif %}>
+                    {{ p.strftime('%m/%Y') }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+
+        <!-- Botones de exporte -->
+        <a href="/reports/export/csv?period={{ current_period.strftime('%Y-%m-01') }}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;" title="Descargar CSV">
+            📥 CSV
+        </a>
+        <a href="/reports/export/xlsx?period={{ current_period.strftime('%Y-%m-01') }}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;" title="Descargar Excel">
+            📊 Excel
+        </a>
+        <a href="/reports/charges?period={{ current_period.strftime('%Y-%m-01') }}" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;">
+            👤 Cargos (RN-43)
+        </a>
+    </div>
+</div>
+
+<!-- 1. Resumen mensual y comparativa -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Resumen mensual ({{ current_period.strftime('%m/%Y') }})</h2>
+    </div>
+    <div class="report-grid report-grid-2">
+        <div class="metric-card">
+            <div class="metric-title">Ingresos contables</div>
+            <div class="metric-value" style="color: var(--success);">{{ summary.current.total_income | currency }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                {% if summary.previous %}
+                Mes anterior: {{ summary.previous.total_income | currency }} 
+                ({{ "%+.1f"|format(summary.income_pct_change or 0) }}%)
+                {% else %}
+                Mes anterior: -
+                {% endif %}
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Gastos contables</div>
+            <div class="metric-value" style="color: var(--danger);">{{ summary.current.total_expense | currency }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                {% if summary.previous %}
+                Mes anterior: {{ summary.previous.total_expense | currency }}
+                ({{ "%+.1f"|format(summary.expense_pct_change or 0) }}%)
+                {% else %}
+                Mes anterior: -
+                {% endif %}
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Ahorro y Distribución</div>
+            <div class="metric-value" style="color: var(--primary);">{{ (summary.current.total_savings + summary.current.total_distributed) | currency }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Ahorro: {{ summary.current.total_savings | currency }} | Distribuido: {{ summary.current.total_distributed | currency }}
+            </div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Resultado Neto</div>
+            <div class="metric-value" style="color: #c084fc;">{{ summary.net_result | currency }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Diferencia mes anterior: {{ summary.net_diff | currency }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<p class="report-note">El resumen mensual y la evolución histórica incluyen ajustes de saldo en sus totales contables. Los consumos por categoría los muestran por separado abajo.</p>
+
+<!-- 2. Gastos por categoría -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Gastos por categoría</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Total: {{ category_expenses.total_expense | currency }}</span>
+    </div>
+    <p class="report-note">Consumos del período, sin ajustes de conciliación. Los porcentajes se calculan sobre este total.</p>
+
+    {% if category_expenses.items %}
+    <div class="chart-container">
+        <canvas id="chart-categories"></canvas>
+    </div>
+
+    <!-- Tabla accesible alternativa requerida por SPEC §6 -->
+    <details style="margin-top: 0.5rem;" open>
+        <summary style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; padding: 0.25rem 0;">
+            Ver detalle en tabla accesible
+        </summary>
+        <table class="accessible-table" aria-label="Gastos por categoría">
+            <thead>
+                <tr>
+                    <th>Categoría</th>
+                    <th class="num">Monto</th>
+                    <th class="num">Porcentaje</th>
+                    <th class="num">Cant.</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in category_expenses.items %}
+                <tr>
+                    <td><strong>{{ item.category_name }}</strong></td>
+                    <td class="num">{{ item.amount | currency }}</td>
+                    <td class="num">{{ item.percentage }}%</td>
+                    <td class="num">{{ item.transaction_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 1rem 0;">
+        No hay gastos registrados en este período.
+    </p>
+    {% endif %}
+</div>
+
+<section class="card" id="balance-adjustments" aria-labelledby="balance-adjustments-title">
+    <div class="card-header">
+        <h2 class="card-title" id="balance-adjustments-title">Ajustes de saldo</h2>
+    </div>
+    <p class="report-note">Correcciones de conciliación del período. No representan compras y conservan su efecto contable y su historial.</p>
+    <div class="adjustment-totals">
+        <span>Ingresos por ajustes: <strong>{{ balance_adjustments.total_income | currency }}</strong></span>
+        <span>Egresos por ajustes: <strong>{{ balance_adjustments.total_expense | currency }}</strong></span>
+    </div>
+    {% if balance_adjustments.items %}
+    <ul class="adjustment-list">
+        {% for item in balance_adjustments.items %}
+        <li>
+            <div class="adjustment-meta">
+                <time datetime="{{ item.date.isoformat() }}">{{ item.date.strftime('%d/%m/%Y') }}</time>
+                <strong>{{ 'Ingreso' if item.kind == 'income' else 'Egreso' }}: {{ item.amount | currency }}</strong>
+            </div>
+            <a href="/transactions/{{ item.transaction_id }}">Movimiento #{{ item.transaction_id }} — {{ item.description }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="report-note">No hay ajustes de saldo en este período.</p>
+    {% endif %}
+</section>
+
+<!-- 3. Evolución histórica 12 meses -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Evolución histórica</h2>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Últimos 12 meses</span>
+    </div>
+
+    {% if evolution.items %}
+    <div class="chart-container">
+        <canvas id="chart-evolution"></canvas>
+    </div>
+
+    <!-- Tabla accesible alternativa requerida por SPEC §6 -->
+    <details style="margin-top: 0.5rem;">
+        <summary style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; padding: 0.25rem 0;">
+            Ver detalle en tabla accesible
+        </summary>
+        <table class="accessible-table" aria-label="Evolución histórica de 12 meses">
+            <thead>
+                <tr>
+                    <th>Período</th>
+                    <th class="num">Ingresos contables</th>
+                    <th class="num">Gastos contables</th>
+                    <th class="num">Neto</th>
+                    <th class="num">Fondo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in evolution.items %}
+                <tr>
+                    <td>{{ item.period.strftime('%m/%Y') }}</td>
+                    <td class="num" style="color: var(--success);">{{ item.income | currency }}</td>
+                    <td class="num" style="color: var(--danger);">{{ item.expense | currency }}</td>
+                    <td class="num">{{ item.net | currency }}</td>
+                    <td class="num">{{ item.fund_balance | currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </details>
+    {% endif %}
+</div>
+
+<!-- 4. Sobres y metas de ahorro -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Sobres y metas</h2>
+        <a href="/envelopes" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">Gestionar sobres &rarr;</a>
+    </div>
+
+    {% if savings_goals.items %}
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for item in savings_goals.items %}
+        <div style="background-color: var(--input-bg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.25rem;">
+                <span style="font-weight: 600;">{{ item.envelope_name }}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">{{ item.category_name }}</span>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.4rem;">
+                <span>Saldo actual: <strong>{{ item.current_balance | currency }}</strong></span>
+                {% if item.target_amount %}
+                <span>Meta: <strong>{{ item.target_amount | currency }}</strong></span>
+                {% endif %}
+            </div>
+
+            {% if item.target_amount and item.target_amount > 0 and item.progress_pct is not none %}
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width: {{ item.progress_pct if item.progress_pct <= 100 else 100 }}%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                <span>Progreso: {{ item.progress_pct }}%</span>
+                {% if item.suggested_monthly_savings and item.suggested_monthly_savings > 0 %}
+                <span>Sugerido/mes: <strong>{{ item.suggested_monthly_savings | currency }}</strong> ({{ item.months_remaining }} meses)</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <table class="accessible-table" style="margin-top: 0.75rem;" aria-label="Resumen de sobres">
+        <thead>
+            <tr>
+                <th>Sobre</th>
+                <th class="num">Saldo Actual</th>
+                <th class="num">Meta</th>
+                <th class="num">Progreso</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in savings_goals.items %}
+            <tr>
+                <td>{{ item.envelope_name }}</td>
+                <td class="num">{{ item.current_balance | currency }}</td>
+                <td class="num">{{ item.target_amount | currency if item.target_amount else "-" }}</td>
+                <td class="num">{{ item.progress_pct }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 1rem 0;">
+        No hay sobres activos configurados.
+    </p>
+    {% endif %}
+</div>
+
+<!-- 5. Métricas del Departamento -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Departamento</h2>
+        <a href="/obligations" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">Ver cuotas &rarr;</a>
+    </div>
+
+    <div class="report-grid report-grid-2" style="margin-bottom: 0.75rem;">
+        <div class="metric-card">
+            <div class="metric-title">Total Pagado (USD)</div>
+            <div class="metric-value" style="color: var(--success);">USD {{ department.total_usd_paid | decimal_ar }}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Total Pagado (ARS)</div>
+            <div class="metric-value" style="color: var(--primary);">{{ department.total_ars_paid | currency }}</div>
+        </div>
+        <div class="metric-card" style="grid-column: 1 / -1;">
+            <div class="metric-title">Cotización Efectiva Ponderada</div>
+            <div class="metric-value" style="color: #f59e0b;">
+                {% if department.overall_effective_fx_rate %}
+                $ {{ department.overall_effective_fx_rate | fx_ar }} / USD
+                {% else %}
+                -
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if department.upcoming_items %}
+    <h3 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">Próximos vencimientos:</h3>
+    <table class="accessible-table" aria-label="Próximos vencimientos del departamento">
+        <thead>
+            <tr>
+                <th>Vencimiento</th>
+                <th class="num">Monto USD</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in department.upcoming_items %}
+            <tr>
+                <td>{{ item.due_date.strftime('%m/%Y') }}</td>
+                <td class="num">USD {{ item.usd_amount | decimal_ar }}</td>
+                <td>{{ item.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<!-- 6. Aportes por persona (proporcional a ingresos) -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Aportes por persona</h2>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">Reparto proporcional según ingresos</span>
+    </div>
+
+    {% if contributions.items %}
+    <div class="report-grid report-grid-2">
+        {% for item in contributions.items %}
+        <div class="metric-card">
+            <div class="metric-title">{{ item.display_name }}</div>
+            <div class="metric-value" style="color: var(--primary);">{{ item.total_income_generated | currency }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Aporte: <strong>{{ item.percentage_of_total }}%</strong> del total
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if contributions.common_income > 0 %}
+    <p class="report-note" style="margin-top: 0.75rem;">
+        🏛️ <strong>Ingresos del fondo común:</strong> {{ contributions.common_income | currency }} (Alquiler cobrado y reintegros generales del hogar, pertenecen a ambos).
+    </p>
+    {% endif %}
+
+    <table class="accessible-table" style="margin-top: 0.75rem;" aria-label="Aportes por persona">
+        <thead>
+            <tr>
+                <th>Persona</th>
+                <th class="num">Aporte Total</th>
+                <th class="num">Porcentaje</th>
+                {% if settlement and settlement.participants %}
+                <th class="num">Obligación Total</th>
+                <th class="num">Ahorro + Colchón</th>
+                <th class="num">Extra Mensual</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% if settlement and settlement.participants %}
+            {% for p in settlement.participants %}
+            <tr>
+                <td>{{ p.display_name }}</td>
+                <td class="num">{{ p.income | currency }}</td>
+                <td class="num">{{ p.percentage }}%</td>
+                <td class="num">{{ p.total_liability | currency }}</td>
+                <td class="num">{{ (p.savings_contribution + p.buffer_contribution) | currency }}</td>
+                <td class="num" style="color: var(--success);"><strong>{{ p.personal_extra | currency }}</strong></td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            {% for item in contributions.items %}
+            <tr>
+                <td>{{ item.display_name }}</td>
+                <td class="num">{{ item.total_income_generated | currency }}</td>
+                <td class="num">{{ item.percentage_of_total }}%</td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 1rem 0;">
+        No hay ingresos registrados en este período.
+    </p>
+    {% endif %}
+</div>
+
+<script nonce="{{ csp_nonce(request) }}">
+document.addEventListener("DOMContentLoaded", function() {
+    if (typeof Chart === "undefined") {
+        return;
+    }
+
+    // Gráfico de Categorías (Doughnut)
+    const catCanvas = document.getElementById("chart-categories");
+    if (catCanvas) {
+        const catData = {{ categories_chart_data | tojson }};
+        if (catData && catData.labels && catData.labels.length > 0) {
+            new Chart(catCanvas, {
+                type: 'doughnut',
+                data: catData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    // Gráfico de Evolución (Línea)
+    const evoCanvas = document.getElementById("chart-evolution");
+    if (evoCanvas) {
+        const evoData = {{ evolution_chart_data | tojson }};
+        if (evoData && evoData.labels && evoData.labels.length > 0) {
+            new Chart(evoCanvas, {
+                type: 'line',
+                data: evoData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

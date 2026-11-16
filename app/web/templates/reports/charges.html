@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style nonce="{{ csp_nonce(request) }}">
+    .charge-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem; }
+    .charge-summary-label { display: block; color: var(--text-muted); font-size: 0.8rem; }
+    .charge-summary-amount { font-size: 1rem; overflow-wrap: anywhere; }
+    .charge-detail-link { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; color: var(--primary); }
+    .charge-period { white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    <div>
+        <a href="/reports?period={{ current_period.strftime('%Y-%m-01') }}" style="color: var(--text-muted); text-decoration: none; font-size: 0.85rem;">
+            &larr; Volver a reportes
+        </a>
+        <h1 style="font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem;">👤 Cargos personales (RN-43)</h1>
+    </div>
+
+    <!-- Selector de período -->
+    <form method="get" action="/reports/charges" style="display: flex; gap: 0.5rem; align-items: center;">
+        <input type="month" name="period" value="{{ current_period.strftime('%Y-%m') }}" class="form-input js-auto-submit" style="padding: 0.4rem 0.6rem; font-size: 0.85rem; min-height: 44px;">
+    </form>
+</div>
+
+<!-- Resumen por persona -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Resumen por persona ({{ current_period.strftime('%m/%Y') }})</h2>
+    </div>
+
+    <p>Los cargos del período se agrupan por su período contable, que puede diferir de la fecha de compra. Los pendientes previos seleccionados en la apertura se muestran por separado y siguen incluidos en el total considerado para el cierre.</p>
+    <p>Lo descontado en el cierre también puede incluir arrastres anteriores. Los gastos de dinero personal ya asignado y los pagos de tarjeta quedan fuera de este reporte.</p>
+
+    {% if report.by_user %}
+    <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+        {% for s in report.by_user %}
+        <div style="background-color: var(--input-bg); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
+                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--primary);">{{ s.display_name }}</h3>
+                <span class="user-badge">{{ s.username }}</span>
+            </div>
+
+            <div class="charge-summary">
+                <div>
+                    <span class="charge-summary-label">Cargos del período:</span>
+                    <strong class="charge-summary-amount">{{ s.current_period_charged | currency }}</strong>
+                </div>
+                <div>
+                    <span class="charge-summary-label">Pendientes previos de apertura:</span>
+                    <strong class="charge-summary-amount">{{ s.previous_period_charged | currency }}</strong>
+                </div>
+                <div>
+                    <span class="charge-summary-label">Cargos considerados para el cierre:</span>
+                    <strong class="charge-summary-amount">{{ s.total_charged | currency }}</strong>
+                </div>
+                <div>
+                    <span class="charge-summary-label">Descontado en cierre:</span>
+                    <strong class="charge-summary-amount">{{ s.deducted_in_close | currency }}</strong>
+                </div>
+            </div>
+
+            {% if s.carried_over_to_next > 0 %}
+            <div style="background-color: var(--warning-bg); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 0.375rem; padding: 0.5rem; font-size: 0.8rem; color: #fcd34d; margin-top: 0.5rem;">
+                ⚠️ Arrastre pendiente para el próximo período: <strong>{{ s.carried_over_to_next | currency }}</strong>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 1rem 0;">
+        No hay cargos personales registrados en este período.
+    </p>
+    {% endif %}
+</div>
+
+<!-- Detalle de transacciones -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Detalle de movimientos imputados</h2>
+    </div>
+
+    {% set has_charges = false %}
+    {% for s in report.by_user %}
+        {% if s.charges %}
+            {% set has_charges = true %}
+        {% endif %}
+    {% endfor %}
+
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;" aria-label="Detalle de cargos personales">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+                    <th style="padding: 0.5rem;">Fecha</th>
+                    <th class="charge-period">Período contable</th>
+                    <th style="padding: 0.5rem;">Imputado a</th>
+                    <th style="padding: 0.5rem;">Descripción</th>
+                    <th style="padding: 0.5rem; text-align: right;">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in report.by_user %}
+                    {% for item in s.charges %}
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.5rem;">{{ item.date.strftime('%d/%m/%Y') }}</td>
+                        <td class="charge-period">{{ (item.period or current_period).strftime('%m/%Y') }}</td>
+                        <td style="padding: 0.5rem;">
+                            <span class="user-badge" style="font-size: 0.75rem;">{{ item.display_name }}</span>
+                        </td>
+                        <td><a class="charge-detail-link" href="/transactions/{{ item.transaction_id }}">{{ item.description }}</a></td>
+                        <td style="padding: 0.5rem; text-align: right; font-weight: 600; color: var(--danger);">
+                            {{ item.amount | currency }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

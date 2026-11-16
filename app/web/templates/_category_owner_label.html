@@ -1,0 +1,2 @@
+<span class="category-owner-label">{% if not category.owner_user_id %}Común{% else %}{% set owner = namespace(name='Otra persona') %}{% for person in users %}{% if person.id == category.owner_user_id %}{% set owner.name = person.display_name %}{% endif %}{% endfor %}{{ owner.name }}{% endif %}{% if category.activity == 'business' %} · Negocio / Emprendimiento{% endif %}</span>
+

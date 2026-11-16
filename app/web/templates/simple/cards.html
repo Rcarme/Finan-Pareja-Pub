@@ -1,0 +1,56 @@
+{% extends "simple/base.html" %}
+{% block content %}
+<div class="screen-title" style="margin-bottom: 1rem;">
+    <h1>Tarjetas y Cuotas 💳</h1>
+    <a href="/cards" class="secondary-button" style="font-size: .85rem; padding: .4rem .8rem;">Importar CSV</a>
+</div>
+
+<section class="balance-card" style="margin-bottom: 1.25rem;">
+    <span class="muted">Deuda total en tarjetas</span>
+    <strong style="color: #fda4af;">{{ total_debt | currency }}</strong>
+    <p class="muted" style="margin-top: .4rem; font-size: .8rem;">Suma de consumos pendientes a liquidar en los resúmenes abiertos.</p>
+</section>
+
+<section class="simple-card">
+    <h2>Tus tarjetas activas</h2>
+    {% for card in cards %}
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: .75rem 0; border-top: {% if not loop.first %}1px solid var(--border){% else %}none{% endif %};">
+        <div>
+            <strong>{{ card.name }}</strong>
+            <span class="muted" style="display: block; font-size: .8rem;">Moneda: {{ card.currency }}</span>
+        </div>
+        <div style="text-align: right;">
+            <strong style="{% if card.debt > 0 %}color: #fda4af;{% else %}color: #86efac;{% endif %}">
+                {{ card.debt | currency }}
+            </strong>
+            <span class="muted" style="display: block; font-size: .75rem;">A pagar</span>
+        </div>
+    </div>
+    {% else %}
+    <p class="muted empty">No hay cuentas de tarjeta configuradas.</p>
+    {% endfor %}
+</section>
+
+<section class="simple-card">
+    <h2>Próximos vencimientos de cuotas</h2>
+    <p class="muted" style="font-size: .85rem; margin-bottom: 1rem;">Cuotas futuras informadas en los resúmenes de tarjeta.</p>
+    {% for month in upcoming_months %}
+    <div style="background: var(--bg); border: 1px solid var(--border); border-radius: .8rem; padding: .85rem; margin-bottom: .75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: .4rem;">
+            <strong>{{ month.display }}</strong>
+            <strong style="color: #fda4af;">{{ month.expense | currency }}</strong>
+        </div>
+        {% for entry in month.entries %}
+        <div style="display: flex; justify-content: space-between; font-size: .82rem; color: var(--muted); padding: .2rem 0;">
+            <span>{{ entry.description }}</span>
+            <span>{{ entry.amount | currency }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted empty">No hay cuotas futuras registradas.</p>
+    {% endfor %}
+</section>
+
+<a href="/forecast" class="secondary-button wide" style="text-align: center; text-decoration: none;">Ver proyección completa de finanzas</a>
+{% endblock %}

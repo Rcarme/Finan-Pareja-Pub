@@ -1,0 +1,9 @@
+{% extends "simple/base.html" %}
+{% block content %}
+{% if transaction.opening_omission %}<p role="note">Gasto que faltó en la foto inicial. Se conserva la fecha real; se cuenta en {{ transaction.period.strftime("%m/%Y") }}.</p>{% endif %}
+<a href="/s/list" class="back-link">← Operaciones</a><h1>Detalle de la operación</h1>
+{% if error %}<div class="alert-error" role="alert">{{ error }}</div>{% endif %}
+<section class="simple-card"><p>{{ category_label(category.name) if category else transaction.kind }}</p><strong class="share-amount">{{ transaction.amount|currency }}</strong><p>{{ transaction.description }}</p><dl class="detail-values"><div><dt>Fecha</dt><dd>{{ transaction.date|date }}</dd></div><div><dt>Estado</dt><dd>{{ 'Anulado' if transaction.status == 'voided' else 'Registrado' }}</dd></div></dl>{% if transaction.status == 'voided' %}<p>Motivo: {{ transaction.void_reason }}</p>{% endif %}</section>
+{% if transaction.status == 'active' %}<a href="/s/{{ transaction.id }}/edit" class="secondary-button wide">Editar</a><details class="simple-card"><summary>Anular operación</summary><p>El movimiento se conserva en el historial con el motivo.</p><form method="post" action="/s/{{ transaction.id }}/void" class="simple-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}"><input type="hidden" name="expected_version" value="{{ transaction.version }}"><label for="reason">Motivo</label><input id="reason" name="reason" required maxlength="255"><button class="danger-button wide" type="submit">Confirmar anulación</button></form></details>{% endif %}
+{% endblock %}
+

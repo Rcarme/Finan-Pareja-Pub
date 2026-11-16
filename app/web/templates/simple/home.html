@@ -1,0 +1,207 @@
+{% extends "simple/base.html" %}
+{% block content %}
+<div class="screen-title"><h1>Tu día a día</h1><a href="/full" class="text-link">Vista completa</a></div>
+<section class="balance-card"><p>Disponible del hogar</p><strong>{{ summary.available|currency }}</strong><p class="muted">Saldo disponible actual del hogar.</p></section>
+{% if summary.personal_balance is not none %}<section class="simple-card"><h2>Mi dinero personal disponible</h2><strong>{{ summary.personal_balance | currency }}</strong><p>Es tu asignación, aunque la plata esté en varias cuentas.</p></section>{% else %}<p class="informative-note">Separación de dinero personal pendiente de apertura.</p>{% endif %}
+{% if retirement is defined and retirement.record_count %}
+<section class="simple-card external-retirement"><h2>Retiro y ahorro externo</h2><strong>{{ retirement.total_registered|currency }}</strong><p class="muted">Aportes brutos registrados, fuera del dinero disponible. No es el capital actual de la póliza.</p><a class="text-link" href="/s/retirement">Ver aportes e histórico</a></section>
+{% endif %}
+{% if user.has_nav('business') and business_summary %}
+<section class="simple-card">
+  <div class="screen-title">
+    <h2>Negocio / Emprendimiento</h2>
+    <a href="/s/business" class="text-link">Ver detalle</a>
+  </div>
+  <p class="muted">Resultado del mes en curso</p>
+  <dl class="detail-values">
+    <div>
+      <dt>Cobros</dt>
+      <dd class="income">{{ business_summary.income | currency }}</dd>
+    </div>
+    <div>
+      <dt>Gastos</dt>
+      <dd>{{ business_summary.expense | currency }}</dd>
+    </div>
+    <div style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem;">
+      <dt><strong>Resultado neto</strong></dt>
+      <dd><strong class="{% if business_summary.result >= 0 %}income{% else %}muted{% endif %}">{{ business_summary.result | currency }}</strong></dd>
+    </div>
+  </dl>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem;">
+    <a href="/s/new?kind=income&amp;activity=business" class="secondary-button" style="min-height: 44px; padding: 0.5rem; font-size: 0.85rem;">+ Cobro</a>
+    <a href="/s/new?kind=expense&amp;activity=business" class="secondary-button" style="min-height: 44px; padding: 0.5rem; font-size: 0.85rem;">+ Gasto</a>
+  </div>
+</section>
+{% endif %}
+<nav class="period-tabs" aria-label="Período informativo">{% for value,label in [('day','Día'),('week','Semana'),('month','Mes'),('year','Año')] %}<a href="/s?window={{ value }}" {% if window == value %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</nav>
+{% if window == 'month' and period_label %}
+<div class="period-navigator" role="navigation" aria-label="Navegación de meses">
+  <a href="/s?window=month&amp;as_of={{ prev_month_iso }}" class="period-nav-btn" aria-label="Mes anterior">‹</a>
+  <span class="period-nav-label">{{ period_label }}</span>
+  {% if next_month_iso %}
+    <a href="/s?window=month&amp;as_of={{ next_month_iso }}" class="period-nav-btn" aria-label="Mes siguiente">›</a>
+  {% else %}
+    <span class="period-nav-btn disabled" aria-hidden="true" title="Mes actual">›</a>
+  {% endif %}
+</div>
+{% endif %}
+<section class="summary-grid"><div class="simple-card"><p>Ingresos</p><strong class="income">{{ summary.income|currency }}</strong></div><div class="simple-card"><p>Gastos</p><strong>{{ summary.expense|currency }}</strong></div></section>
+<section class="simple-card"><h2>En qué gastamos</h2>
+{% if summary.categories %}<div class="chart-wrap"><canvas id="simple-category-chart" aria-label="Gastos por categoría" role="img"></canvas></div>
+<script type="application/json" id="simple-chart-data">{{ summary.categories|map(attribute='amount')|map('string')|list|tojson }}</script>
+<script type="application/json" id="simple-chart-labels">{{ summary.categories|map(attribute='name')|list|tojson }}</script>
+<script type="application/json" id="simple-chart-links">[{% for category in summary.categories %}{{ ('/s/list?window=' ~ window ~ '&kind=expense&category_id=' ~ category.category_id ~ '&scope=summary' ~ ('&as_of=' ~ as_of if as_of else ''))|tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<ul class="category-legend">{% for category in summary.categories %}<li><a class="category-summary-link" href="/s/list?window={{ window }}&amp;kind=expense&amp;category_id={{ category.category_id }}&amp;scope=summary{% if as_of %}&amp;as_of={{ as_of }}{% endif %}"><span class="legend-dot color-{{ category.color }}" aria-hidden="true"></span><span>{{ category_label(category.name) }}</span><strong>{{ category.amount|currency }}</strong><small>{{ category.percentage|decimal_ar }} % · Ver movimientos</small></a></li>{% endfor %}</ul>
+{% else %}<p class="muted empty">Sin gastos registrados en este período.</p>{% endif %}
+<p class="informative-note">Vista informativa; el cierre del mes es la fuente oficial</p>
+</section>
+{% if summary.adjustment_income or summary.adjustment_expense %}
+<section class="simple-card"><h2>Ajustes de saldo</h2>
+<p class="muted">Correcciones por conciliación, separadas del consumo. Conservan su efecto en el saldo.</p>
+<dl class="detail-values"><div><dt>Aumentos de saldo</dt><dd>{{ summary.adjustment_income|currency }}</dd></div><div><dt>Disminuciones de saldo</dt><dd>{{ summary.adjustment_expense|currency }}</dd></div></dl>
+</section>
+{% endif %}
+<section class="simple-card"><h2>Mi parte del mes</h2>
+{% if settlement and settlement.participants %}
+<p class="muted">Reparto proporcional según ingresos{% if period_label %} ({{ period_label }}){% endif %}</p>
+<dl class="detail-values">
+  {% for p in settlement.participants %}
+  <div>
+    <dt><strong>{{ p.display_name }} ({{ p.percentage|decimal_ar }} %)</strong></dt>
+    <dd><strong>{{ p.total_liability|currency }}</strong></dd>
+  </div>
+  <div style="font-size: 0.8rem; color: var(--muted, #94a3b8); padding-left: 0.4rem;">
+    <dt>Cuota depto + Tarjetas comunes{% if p.common_income_share > 0 %} (- alquiler){% endif %}</dt>
+    <dd>{{ p.housing_share|currency }} + {{ p.card_common_share|currency }}{% if p.common_income_share > 0 %} - {{ p.common_income_share|currency }}{% endif %}</dd>
+  </div>
+  <div style="font-size: 0.8rem; color: var(--muted, #94a3b8); padding-left: 0.4rem;">
+    <dt>Común neto + Gastos particulares</dt>
+    <dd>{{ p.shared_expenses_assigned|currency }} + {{ p.personal_expenses|currency }}</dd>
+  </div>
+  {% endfor %}
+</dl>
+<div style="border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.6rem;">
+  <p style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.92rem;">Saldos a cubrir en tarjetas / obligaciones:</p>
+  <dl class="detail-values">
+    {% for p in settlement.participants %}
+    <div>
+      <dt>{{ p.display_name }}{% if p.direct_payments > 0 %} <small class="muted">(pagó {{ p.direct_payments|currency }})</small>{% endif %}</dt>
+      <dd><strong>{{ p.net_remaining_to_pay|currency }}</strong></dd>
+    </div>
+    {% endfor %}
+  </dl>
+</div>
+{% if settlement.total_surplus > 0 %}
+<div style="border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.6rem;">
+  <p style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.92rem;">Excedente del mes ({{ settlement.total_surplus|currency }}):</p>
+  <dl class="detail-values">
+    <div>
+      <dt>Ahorro común (30 %)</dt>
+      <dd><strong>{{ settlement.total_savings_target|currency }}</strong></dd>
+    </div>
+    <div style="font-size: 0.8rem; color: var(--muted, #94a3b8); padding-left: 0.4rem;">
+      <dt>Aporte proporcional</dt>
+      <dd>{% for p in settlement.participants %}{{ p.display_name }}: {{ p.savings_contribution|currency }}{% if not loop.last %} · {% endif %}{% endfor %}</dd>
+    </div>
+    <div>
+      <dt>Colchón común (20 %)</dt>
+      <dd><strong>{{ settlement.total_buffer_target|currency }}</strong></dd>
+    </div>
+    <div style="font-size: 0.8rem; color: var(--muted, #94a3b8); padding-left: 0.4rem;">
+      <dt>Aporte proporcional</dt>
+      <dd>{% for p in settlement.participants %}{{ p.display_name }}: {{ p.buffer_contribution|currency }}{% if not loop.last %} · {% endif %}{% endfor %}</dd>
+    </div>
+    {% for p in settlement.participants %}
+    <div style="padding-top: 0.25rem;">
+      <dt><strong>Extra libre {{ p.display_name }} (50 % igualado)</strong></dt>
+      <dd><strong class="income">{{ p.personal_extra|currency }}</strong></dd>
+    </div>
+    {% endfor %}
+  </dl>
+</div>
+{% endif %}
+{% for p in settlement.participants if loop.last %}
+<div style="border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.6rem;">
+  <p style="font-weight: 700; margin-bottom: 0.35rem; font-size: 0.92rem;">Transferencia de {{ p.display_name }} a Pareja:</p>
+  <dl class="detail-values">
+    <div>
+      <dt>1. Parte Cuota depto ({{ p.percentage|decimal_ar }} %)</dt>
+      <dd>{{ p.housing_share|currency }}</dd>
+    </div>
+    <div>
+      <dt>2. Parte Tarjetas comunes ({{ p.percentage|decimal_ar }} %)</dt>
+      <dd>{{ p.card_common_share|currency }}</dd>
+    </div>
+    {% if p.common_income_share > 0 %}
+    <div>
+      <dt>3. Menos Alquiler/Reintegros ({{ p.percentage|decimal_ar }} %)</dt>
+      <dd class="income">- {{ p.common_income_share|currency }}</dd>
+    </div>
+    {% endif %}
+    <div>
+      <dt>4. Gastos particulares {{ p.display_name }} (100 %)</dt>
+      <dd>{{ p.personal_expenses|currency }}</dd>
+    </div>
+    {% if p.direct_payments > 0 %}
+    <div>
+      <dt>Menos pagos directos {{ p.display_name }} (ej. mecánico)</dt>
+      <dd class="income">- {{ p.direct_payments|currency }}</dd>
+    </div>
+    {% endif %}
+    <div style="border-top: 1px solid var(--border); padding-top: 0.4rem; margin-top: 0.25rem;">
+      <dt><strong>Total en pesos para Depto + Tarjetas</strong></dt>
+      <dd><strong class="income">{{ p.net_remaining_to_pay|currency }}</strong></dd>
+    </div>
+    {% if p.real_balance_usd > 0 %}
+    <div>
+      <dt><strong>Transferencia directa a Ahorro (USD)</strong></dt>
+      <dd><strong class="income">USD {{ p.real_balance_usd|decimal_ar }} ({{ p.real_balance_usd_ars|currency }})</strong></dd>
+    </div>
+    {% else %}
+    <div>
+      <dt>5. Aporte Ahorro + Colchón ({{ p.percentage|decimal_ar }} %)</dt>
+      <dd>{{ (p.savings_contribution + p.buffer_contribution)|currency }}</dd>
+    </div>
+    <div>
+      <dt>6. Ajuste para igualar Extra 50/50</dt>
+      <dd class="income">- {{ p.equalization_adjustment|currency }}</dd>
+    </div>
+    <div style="border-top: 1px solid var(--border); padding-top: 0.4rem; margin-top: 0.25rem;">
+      <dt><strong>Total a transferir a Pareja</strong></dt>
+      <dd><strong class="income">{{ p.total_transfer_to_central|currency }}</strong></dd>
+    </div>
+    {% endif %}
+  </dl>
+  {% if p.real_balance_total_ars > 0 %}
+  <div style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.5rem;">
+    <p style="font-weight: 700; margin-bottom: 0.3rem; font-size: 0.88rem;">Liquidación según saldo real de {{ p.display_name }}:</p>
+    <dl class="detail-values">
+      <div>
+        <dt>Saldo real hoy en pesos (Efectivo + MP)</dt>
+        <dd><strong>{{ p.real_balance_ars|currency }}</strong></dd>
+      </div>
+      {% if p.real_balance_usd > 0 %}
+      <div>
+        <dt>Saldo real en dólares (va a Ahorro)</dt>
+        <dd><strong>USD {{ p.real_balance_usd|decimal_ar }} ({{ p.real_balance_usd_ars|currency }})</strong></dd>
+      </div>
+      {% endif %}
+      <div style="border-top: 1px dashed var(--border); padding-top: 0.3rem;">
+        <dt><strong>Pasa en pesos (MP + parte Efectivo)</strong></dt>
+        <dd><strong class="income">{{ p.net_remaining_to_pay|currency }}</strong></dd>
+      </div>
+      <div>
+        <dt><strong>Le quedan libres en mano (Efectivo)</strong></dt>
+        <dd><strong class="income">{{ p.remaining_ars_after_obligations|currency }}</strong></dd>
+      </div>
+    </dl>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+{% if summary.close_share %}<p style="margin-top: 0.5rem;">Último cierre · {{ summary.close_share.period|date }}</p><strong class="share-amount">{{ summary.close_share.amount|currency }}</strong><dl class="detail-values"><div><dt>Cargos personales</dt><dd>{{ summary.close_share.charges|currency }}</dd></div><div><dt>Arrastre</dt><dd>{{ summary.close_share.carryover|currency }}</dd></div><div><dt>Ahorro total del cierre</dt><dd>{{ summary.close_share.total_savings|currency }}</dd></div></dl>{% endif %}
+</section>
+<section class="simple-card"><div class="screen-title"><h2>Últimas operaciones</h2><a href="/s/list{% if as_of %}?as_of={{ as_of }}&amp;window={{ window }}{% endif %}" class="text-link">Ver todas</a></div>{% with transactions=transactions, show_date=true %}{% include "simple/_transactions.html" %}{% endwith %}</section>
+<a href="/s/new" class="primary-button wide">Agregar una operación</a>
+{% endblock %}

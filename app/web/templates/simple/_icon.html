@@ -1,0 +1,6 @@
+{% if category.icon in svg_icons %}
+<svg class="category-icon color-{{ category.color }}" aria-hidden="true"><use href="/static/icons/simple.svg#{{ category.icon }}"></use></svg>
+{% else %}
+<span class="category-icon category-emoji" aria-hidden="true">{{ category.icon }}</span>
+{% endif %}
+

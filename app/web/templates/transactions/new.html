@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Cargar movimiento</h2>
+        <a href="/" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">✕ Cancelar</a>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/transactions" id="tx-form" data-retry="{{ 'true' if is_retry else 'false' }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+
+        <!-- Selector de Tipo de Movimiento -->
+        <div class="form-group">
+            <label for="activity">Actividad</label>
+            <select id="activity" name="activity" class="form-control">
+                {% for value, label in [('household','Hogar'),('business','Negocio / Emprendimiento'),('personal','Dinero personal ya repartido')] %}
+                <option value="{{ value }}" {% if default_activity|default('household') == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <p>La actividad y a quién corresponde el gasto son independientes de la tarjeta o cuenta de origen.</p>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Tipo de movimiento</label>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem;">
+                <label style="display: flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer; background-color: {% if default_kind == 'expense' %}var(--danger-bg){% else %}var(--input-bg){% endif %};" id="label-expense">
+                    <input type="radio" name="kind" value="expense" {% if default_kind == 'expense' %}checked{% endif %}>
+                    <span style="font-size: 0.85rem; font-weight: 600;">Gasto</span>
+                </label>
+                <label style="display: flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer; background-color: {% if default_kind == 'income' %}var(--success-bg){% else %}var(--input-bg){% endif %};" id="label-income">
+                    <input type="radio" name="kind" value="income" {% if default_kind == 'income' %}checked{% endif %}>
+                    <span style="font-size: 0.85rem; font-weight: 600;">Ingreso</span>
+                </label>
+                <label style="display: flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer; background-color: {% if default_kind == 'transfer' %}rgba(56, 189, 248, 0.15){% else %}var(--input-bg){% endif %};" id="label-transfer">
+                    <input type="radio" name="kind" value="transfer" {% if default_kind == 'transfer' %}checked{% endif %}>
+                    <span style="font-size: 0.85rem; font-weight: 600;">Transferir</span>
+                </label>
+                <label style="display: flex; align-items: center; justify-content: center; gap: 0.35rem; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; cursor: pointer; background-color: {% if default_kind == 'distribution' %}rgba(168, 85, 247, 0.15){% else %}var(--input-bg){% endif %};" id="label-distribution">
+                    <input type="radio" name="kind" value="distribution" {% if default_kind == 'distribution' %}checked{% endif %}>
+                    <span style="font-size: 0.85rem; font-weight: 600;">Retiro</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Monto (Teclado numérico y tamaño grande) -->
+        <div class="form-group">
+            <label class="form-label" for="amount">Monto ($)</label>
+            <input
+                type="text"
+                id="amount"
+                name="amount"
+                inputmode="decimal"
+                placeholder="0,00"
+                required
+                autofocus
+                class="form-control"
+                style="font-size: 1.5rem; font-weight: 700; text-align: right; padding: 0.75rem 1rem;"
+                value="{{ form_amount | default('') }}"
+            >
+        </div>
+
+        <!-- Cuenta Origen -->
+        <div class="form-group">
+            <label class="form-label" for="account_id" id="account_label">Cuenta</label>
+            <select id="account_id" name="account_id" class="form-control" required>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if acc.id == default_account_id %}selected{% endif %}>
+                    {{ acc.name }} ({{ acc.balance | currency }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Cuenta Destino (Solo para transferencias) -->
+        <div class="form-group" id="to_account_group" style="display: {% if default_kind == 'transfer' %}block{% else %}none{% endif %};">
+            <label class="form-label" for="to_account_id">Cuenta Destino</label>
+            <select id="to_account_id" name="to_account_id" class="form-control">
+                <option value="">Seleccionar cuenta destino...</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if form_to_account_id == acc.id %}selected{% endif %}>
+                    {{ acc.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Beneficiario de Retiro (Solo para distribution, RN-07, RN-16) -->
+        <div class="form-group" id="recipient_group" style="display: {% if default_kind == 'distribution' %}block{% else %}none{% endif %};">
+            <label class="form-label" for="recipient_user_id">Beneficiario del retiro</label>
+            <select id="recipient_user_id" name="recipient_user_id" class="form-control">
+                <option value="">Seleccionar beneficiario...</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if form_recipient_user_id == u.id %}selected{% endif %}>{{ u.display_name }}</option>
+                {% endfor %}
+            </select>
+            <div style="margin-top: 0.75rem; padding: 0.65rem; border: 1px solid var(--danger, #ef4444); border-radius: 0.5rem; background-color: var(--danger-bg, rgba(239, 68, 68, 0.1));">
+                <label for="confirm_overdraft" style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; color: var(--danger, #ef4444); font-weight: 600;">
+                    <input type="checkbox" id="confirm_overdraft" name="confirm_overdraft" value="1" {% if form_confirm_overdraft in ("1", "on", "true") %}checked{% endif %} style="margin-top: 0.2rem; min-width: 18px; min-height: 18px;">
+                    <span>Entiendo que si el retiro deja el Disponible negativo o supera el saldo de la cuenta debo confirmarlo explícitamente (RN-07, RN-16).</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Categoría (Solo para gastos e ingresos) -->
+        <div class="form-group" id="category_group" style="display: {% if default_kind in ('expense', 'income') %}block{% else %}none{% endif %};">
+            {% include "_category_visibility.html" %}
+            <label class="form-label" for="category_id">Categoría</label>
+            <select id="category_id" name="category_id" class="form-control">
+                <option value="">Seleccionar categoría...</option>
+                {% for cat in categories %}
+                <option data-category-owner="{{ cat.owner_user_id or '' }}" data-activity="{{ cat.activity }}" value="{{ cat.id }}" data-kind="{{ cat.kind }}" data-charged="{{ cat.default_charged_to_user_id or '' }}" data-offset="{{ cat.default_period_offset }}" {% if form_category_id == cat.id %}selected{% endif %}>
+                    {{ cat.name }} ({{ 'Gasto' if cat.kind == 'expense' else 'Ingreso' }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Sobre origen opcional (Solo para gastos, RN-14) -->
+        <div class="form-group" id="envelope_group" style="display: {% if default_kind == 'expense' %}block{% else %}none{% endif %};">
+            <label class="form-label" for="envelope_id">Descontar de sobre (opcional, RN-14)</label>
+            <select id="envelope_id" name="envelope_id" class="form-control">
+                <option value="">Disponible libre (sin sobre)</option>
+                {% for env in envelopes | default([]) %}
+                <option value="{{ env.id }}" {% if form_envelope_id == env.id %}selected{% endif %}>{{ env.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Cargo personal (RN-40, RN-41) -->
+        <div class="form-group" id="charged_to_group" style="display: {% if default_kind in ('expense', 'income') %}block{% else %}none{% endif %};">
+            <label class="form-label" for="charged_to_user_id">A cargo de</label>
+            <select id="charged_to_user_id" name="charged_to_user_id" class="form-control">
+                <option value="">Común (Fondo de ambos)</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {% if form_charged_to_user_id == u.id %}selected{% endif %}>{{ u.display_name }}</option>
+                {% endfor %}
+            </select>
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; display: block;">
+                Los gastos personales se pagan desde el fondo y se descuentan al cierre (RN-40).
+            </span>
+        </div>
+
+        {% include "_opening_omission.html" %}
+        <!-- Fechas: fecha del movimiento y mes de imputación (RN-18) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+                <label class="form-label" for="tx_date">Fecha</label>
+                <input type="date" id="tx_date" name="tx_date" class="form-control" value="{{ today }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="period">Mes de imputación</label>
+                <input type="month" id="period" name="period" class="form-control" value="{{ current_period }}" required>
+            </div>
+        </div>
+
+        <!-- Descripción -->
+        <div class="form-group">
+            <label class="form-label" for="description">Descripción</label>
+            <input type="text" id="description" name="description" class="form-control" placeholder="Ej: Compra supermercado, Nafta, Alquiler..." value="{{ form_description | default('') }}" required>
+        </div>
+
+        <!-- Botón Guardar -->
+        <div style="margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1.05rem;" id="submit-btn">
+                Guardar Movimiento
+            </button>
+        </div>
+    </form>
+</div>
+
+<script nonce="{{ csp_nonce(request) }}">
+function updateKindUI(kind) {
+    const toAccGroup = document.getElementById('to_account_group');
+    const recipientGroup = document.getElementById('recipient_group');
+    const catGroup = document.getElementById('category_group');
+    const envGroup = document.getElementById('envelope_group');
+    const chargedGroup = document.getElementById('charged_to_group');
+    const accLabel = document.getElementById('account_label');
+
+    const labelExpense = document.getElementById('label-expense');
+    const labelIncome = document.getElementById('label-income');
+    const labelTransfer = document.getElementById('label-transfer');
+    const labelDist = document.getElementById('label-distribution');
+
+    labelExpense.style.backgroundColor = kind === 'expense' ? 'var(--danger-bg)' : 'var(--input-bg)';
+    labelIncome.style.backgroundColor = kind === 'income' ? 'var(--success-bg)' : 'var(--input-bg)';
+    labelTransfer.style.backgroundColor = kind === 'transfer' ? 'rgba(56, 189, 248, 0.15)' : 'var(--input-bg)';
+    if (labelDist) {
+        labelDist.style.backgroundColor = kind === 'distribution' ? 'rgba(168, 85, 247, 0.15)' : 'var(--input-bg)';
+    }
+
+    if (kind === 'transfer') {
+        toAccGroup.style.display = 'block';
+        if (recipientGroup) recipientGroup.style.display = 'none';
+        catGroup.style.display = 'none';
+        if (envGroup) envGroup.style.display = 'none';
+        chargedGroup.style.display = 'none';
+        accLabel.textContent = 'Cuenta Origen';
+    } else if (kind === 'distribution') {
+        toAccGroup.style.display = 'none';
+        if (recipientGroup) recipientGroup.style.display = 'block';
+        catGroup.style.display = 'none';
+        if (envGroup) envGroup.style.display = 'none';
+        chargedGroup.style.display = 'none';
+        accLabel.textContent = 'Cuenta Origen';
+    } else {
+        toAccGroup.style.display = 'none';
+        if (recipientGroup) recipientGroup.style.display = 'none';
+        catGroup.style.display = 'block';
+        if (envGroup) envGroup.style.display = kind === 'expense' ? 'block' : 'none';
+        chargedGroup.style.display = 'block';
+        accLabel.textContent = 'Cuenta';
+    }
+}
+
+// Vista previa del mes de imputación usando aritmética numérica sin new Date (RN-18, H-05)
+let chargeWasChosen = document.getElementById('tx-form')?.dataset.retry === 'true';
+let periodWasChosen = chargeWasChosen;
+document.getElementById('period').addEventListener('change', () => { periodWasChosen = true; });
+document.getElementById("charged_to_user_id").addEventListener("change", () => {
+    chargeWasChosen = true;
+});
+function applyCategoryDefaultsPreview(event) {
+    const catSelect = document.getElementById('category_id');
+    const selected = catSelect.options[catSelect.selectedIndex];
+    if (!selected || !selected.value) return;
+
+    const charged = selected.dataset.charged;
+    if (event?.target.id === "category_id" && !chargeWasChosen) {
+        document.getElementById('charged_to_user_id').value = charged || "";
+    }
+
+    const offset = parseInt(selected.dataset.offset || '0', 10);
+    const dateInput = document.getElementById('tx_date').value;
+    if (dateInput && !periodWasChosen) {
+        const parts = dateInput.split('-');
+        if (parts.length >= 2) {
+            const year = parseInt(parts[0], 10);
+            const monthIndex = parseInt(parts[1], 10) - 1 + offset;
+            const targetYear = year + Math.floor(monthIndex / 12);
+            const targetMonth = ((monthIndex % 12) + 12) % 12 + 1;
+            const suggested = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+            const omission = document.getElementById('opening_omission');
+            const opening = document.querySelector('[data-opening-date]')?.dataset.openingDate;
+            document.getElementById('period').value = omission?.checked && opening && suggested < opening.slice(0, 7) ? opening.slice(0, 7) : suggested;
+        }
+    }
+}
+
+document.getElementById('category_id').addEventListener('change', applyCategoryDefaultsPreview);
+document.getElementById('tx_date').addEventListener('change', applyCategoryDefaultsPreview);
+
+// Inicializar UI al cargar y registrar listener para cambio de tipo
+document.addEventListener('DOMContentLoaded', function() {
+    const currentKind = document.querySelector('input[name="kind"]:checked')?.value || 'expense';
+    updateKindUI(currentKind);
+
+    document.querySelectorAll('input[name="kind"]').forEach(function(radio) {
+        radio.addEventListener('change', function(e) {
+            updateKindUI(e.target.value);
+        });
+    });
+});
+</script>
+{% endblock %}

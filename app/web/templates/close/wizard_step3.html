@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style nonce="{{ csp_nonce(request) }}">
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    .step-indicator::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--card-border);
+        z-index: 1;
+        transform: translateY(-50%);
+    }
+    .step-badge {
+        position: relative;
+        z-index: 2;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        background-color: var(--card-bg);
+        border: 2px solid var(--card-border);
+        color: var(--text-muted);
+    }
+    .step-badge.active {
+        border-color: var(--primary);
+        color: var(--primary);
+        background-color: rgba(56, 189, 248, 0.15);
+    }
+    .step-badge.completed {
+        border-color: var(--success);
+        color: var(--success);
+        background-color: var(--success-bg);
+    }
+    .step-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-color);
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">
+            🏁 Cierre de Mes ({{ period_display }})
+        </h2>
+        <a href="/close/history" class="btn btn-outline btn-sm">Historial</a>
+    </div>
+
+    <!-- Indicador de pasos -->
+    <div class="step-indicator">
+        <div class="step-badge completed">✓</div>
+        <div class="step-badge completed">✓</div>
+        <div class="step-badge active" title="Paso 3: Destinos">3</div>
+        <div class="step-badge" title="Paso 4: Confirmar">4</div>
+    </div>
+
+    <div class="step-title">Paso 3: Asignaciones y Cuentas de Destino</div>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem;">
+        Configure la reserva para refuerzos del departamento y las cuentas bancarias donde cada uno recibirá su retiro (RN-20, RN-30).
+    </p>
+
+    <form method="get" action="/close/wizard">
+        <input type="hidden" name="step" value="4">
+        <input type="hidden" name="period" value="{{ period_str }}">
+
+        <!-- Reserva de refuerzos -->
+        <div class="form-group">
+            <label class="form-label" for="reinforcement_reservation">
+                🏢 Reserva de Refuerzos R (ARS)
+            </label>
+            <input 
+                type="text" 
+                inputmode="decimal" 
+                id="reinforcement_reservation" 
+                name="reinforcement_reservation" 
+                class="form-control" 
+                value="{{ reinforcement_reservation | default('0,00') }}"
+                required
+            >
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Sugerencia mensual según cronograma y cotización de referencia: 
+                <strong style="color: var(--primary);">{{ suggested_reinforcement | currency }}</strong>.
+                Se aparta del disponible antes de calcular el reparto configurado (RN-20).
+            </div>
+        </div>
+
+        <!-- Cuentas destino por usuario -->
+        <div style="margin-top: 1.25rem; margin-bottom: 1rem;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-color); margin-bottom: 0.5rem;">
+                💳 Cuentas de origen para los retiros de cada uno
+            </h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+                Indique de qué cuenta contable se descuenta el retiro correspondiente a cada beneficiario.
+            </p>
+
+            {% for u in users %}
+            <div class="form-group">
+                <label class="form-label" for="dest_account_{{ u.id }}">
+                    Cuenta para {{ u.display_name }}:
+                </label>
+                <select id="dest_account_{{ u.id }}" name="dest_account_{{ u.id }}" class="form-control" required>
+                    {% for acc in accounts %}
+                    <option value="{{ acc.id }}" {% if selected_destinations.get('dest_account_' ~ u.id) == acc.id|string %}selected{% endif %}>{{ acc.name }} ({{ acc.type }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+
+        <fieldset style="border: 0; margin-top: 1rem;">
+            <legend class="form-label">Destinos del ahorro ({{ split_config.savings_pct }}%)</legend>
+            <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">
+                Podés repartir el ahorro entre sobres. Dejá todos vacíos para asignarlo a Ahorro común.
+                Si indicás montos, la suma debe coincidir con el ahorro de la vista previa.
+            </p>
+            {% for item in savings_envelopes %}
+            <div class="form-group">
+                <label class="form-label" for="savings_dest_{{ item.envelope.id }}">{{ item.envelope.name }} — saldo {{ item.balance | currency }}</label>
+                <input type="text" inputmode="decimal" class="form-control"
+                       id="savings_dest_{{ item.envelope.id }}" name="savings_dest_{{ item.envelope.id }}"
+                       value="{{ selected_destinations.get('savings_dest_' ~ item.envelope.id, '') }}" placeholder="Opcional, en pesos">
+            </div>
+            {% endfor %}
+        </fieldset>
+
+        <div style="display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 1.5rem;">
+            <a href="/close/wizard?step=2&period={{ period_str }}" class="btn btn-secondary" style="flex: 1; text-align: center; text-decoration: none;">
+                ← Paso 2
+            </a>
+            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                Paso 4: Vista Previa →
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

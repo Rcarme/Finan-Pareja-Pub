@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style nonce="{{ csp_nonce(request) }}">
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+    .step-indicator::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--card-border);
+        z-index: 1;
+        transform: translateY(-50%);
+    }
+    .step-badge {
+        position: relative;
+        z-index: 2;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        background-color: var(--card-bg);
+        border: 2px solid var(--card-border);
+        color: var(--text-muted);
+    }
+    .step-badge.active {
+        border-color: var(--primary);
+        color: var(--primary);
+        background-color: rgba(56, 189, 248, 0.15);
+    }
+    .step-badge.completed {
+        border-color: var(--success);
+        color: var(--success);
+        background-color: var(--success-bg);
+    }
+    .step-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-color);
+        margin-bottom: 0.5rem;
+    }
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+    .summary-item {
+        background-color: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+    }
+    .summary-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+    }
+    .summary-val {
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">
+            🏁 Cierre de Mes ({{ period_display }})
+        </h2>
+        <a href="/close/history" class="btn btn-outline btn-sm">Historial</a>
+    </div>
+
+    <!-- Indicador de pasos -->
+    <div class="step-indicator">
+        <div class="step-badge active" title="Paso 1: Revisar">1</div>
+        <div class="step-badge" title="Paso 2: Conciliar">2</div>
+        <div class="step-badge" title="Paso 3: Destinos">3</div>
+        <div class="step-badge" title="Paso 4: Confirmar">4</div>
+    </div>
+
+    <div class="step-title">Paso 1: Revisar movimientos del período</div>
+    <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem;">
+        Verifique los ingresos y gastos imputados al mes de <strong>{{ period_display }}</strong> antes de proceder al cálculo del excedente y reparto.
+    </p>
+
+    {% if request.query_params.get('reopened') %}
+    <div class="alert alert-success">
+        🔓 <strong>Período reabierto correctamente (RN-25).</strong> Los retiros y asignaciones del cierre anterior han sido revertidos y el período vuelve a estar abierto.
+    </div>
+    {% endif %}
+
+    {% if is_closed %}
+    <div class="alert alert-warning">
+        ⚠️ <strong>Este período ya está cerrado.</strong> Puede revisar los detalles en la pantalla de detalle o reabrirlo formalmente si es el último período cerrado.
+        <div style="margin-top: 0.5rem;">
+            <a href="/close/{{ period_str }}" class="btn btn-secondary btn-sm">Ver detalle del cierre</a>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if is_period_current_or_future %}
+    <div class="alert alert-warning">
+        ⏳ <strong>Aviso (RN-26):</strong> El período {{ period_display }} aún está en curso. Se recomienda efectuar el cierre al concluir el mes, aunque puede continuar con la vista previa.
+    </div>
+    {% endif %}
+
+    {% if is_deficit %}
+    <div class="alert alert-danger">
+        ⚠️ <strong>Déficit detectado (RN-21):</strong> El Disponible es menor o igual a cero. En este cierre no habrá reparto 50/50 ni aportes a sobres. Los cargos personales pasarán a arrastre para el siguiente mes.
+    </div>
+    {% endif %}
+
+    <div class="summary-grid">
+        <div class="summary-item">
+            <div class="summary-label">Ingresos del período</div>
+            <div class="summary-val" style="color: var(--success);">{{ total_income | currency }}</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Gastos del período</div>
+            <div class="summary-val" style="color: var(--danger);">{{ total_expenses | currency }}</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 1rem; background-color: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 0.5rem; padding: 1rem; text-align: center;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">Disponible actual acumulado (D)</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: {% if is_deficit %}var(--danger){% else %}var(--primary){% endif %};">
+            {{ available | currency }}
+        </div>
+    </div>
+
+    <div style="margin-top: 1.5rem; display: flex; justify-content: space-between; gap: 0.75rem;">
+        <a href="/transactions?period={{ period_display }}" class="btn btn-secondary" style="flex: 1; text-align: center; text-decoration: none;">
+            Ver movimientos
+        </a>
+        <a href="/close/wizard?step=2&period={{ period_str }}" class="btn btn-primary" style="flex: 1; text-align: center; text-decoration: none;">
+            Paso 2: Conciliar →
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e293b">
+    <title>Sin conexión — Finanzas en Común</title>
+    <style nonce="{{ csp_nonce(request) }}">
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #38bdf8;
+            --warning: #f59e0b;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        .offline-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 2rem 1.5rem;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        .icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: var(--text-color);
+        }
+        p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 1.25rem;
+        }
+        .badge-rn {
+            display: inline-block;
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        .btn-retry {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            width: 100%;
+            background-color: var(--primary);
+            color: #0f172a;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        .btn-retry:active {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-card">
+        <span class="icon">📡</span>
+        <h1>Estás sin conexión</h1>
+        <div class="badge-rn">Regla contable RN-39</div>
+        <p>
+            No se pueden registrar movimientos ni modificar datos contables mientras estés desconectado. 
+            La app no guarda borradores offline para proteger la exactitud de los saldos y evitar duplicados.
+        </p>
+        <button type="button" class="btn-retry" id="btn-retry-offline">
+            Reintentar conexión
+        </button>
+    </div>
+
+    <script nonce="{{ csp_nonce(request) }}">
+        document.getElementById('btn-retry-offline')?.addEventListener('click', () => {
+            window.location.reload();
+        });
+        // Si la conexión se recupera automáticamente, recargar la página
+        window.addEventListener('online', () => {
+            window.location.reload();
+        });
+    </script>
+</body>
+</html>

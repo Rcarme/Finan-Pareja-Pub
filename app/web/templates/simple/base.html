@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f172a"><title>Finanzas · Vista simple</title>
+<link rel="manifest" href="/manifest.webmanifest"><link rel="stylesheet" href="/static/css/simple.css?v=3">
+<script nonce="{{ csp_nonce(request) }}" src="/static/js/chart.umd.min.js" defer></script><script nonce="{{ csp_nonce(request) }}" src="/static/js/simple.js" defer></script>
+<script nonce="{{ csp_nonce(request) }}" src="/static/js/pwa.js?v=2" defer></script>
+<link rel="stylesheet" href="/static/css/pwa.css?v=2">
+{% block head %}{% endblock %}
+<script nonce="{{ csp_nonce(request) }}" src="/static/js/activity.js?v=2" defer></script>
+</head>
+<body>
+<header class="simple-header"><a href="/s" class="brand">Finanzas</a><span>{{ user.display_name }}</span><a href="/s/settings" class="header-action" aria-label="Configuración">⚙</a></header>
+<main class="simple-main">{% block content %}{% endblock %}</main>
+<nav class="bottom-nav" aria-label="Navegación principal">
+{% if user.has_nav('home') or nav == 'home' %}<a href="/s" {% if nav == 'home' %}aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>Inicio</a>{% endif %}
+{% if user.has_nav('list') or nav == 'list' %}<a href="/s/list" {% if nav == 'list' %}aria-current="page"{% endif %}><span aria-hidden="true">≡</span>Movimientos</a>{% endif %}
+{% if user.has_nav('spending') or nav == 'spending' %}<a href="/s/spending" {% if nav == 'spending' %}aria-current="page"{% endif %}><span aria-hidden="true">◔</span>Quién gastó</a>{% endif %}
+{% if user.has_nav('cards') or nav == 'cards' %}<a href="/s/cards" {% if nav == 'cards' %}aria-current="page"{% endif %}><span aria-hidden="true">💳</span>Tarjetas</a>{% endif %}
+{% if user.has_nav('close') or nav == 'close' %}<a href="/s/close" {% if nav == 'close' %}aria-current="page"{% endif %}><span aria-hidden="true">📅</span>Cierres</a>{% endif %}
+{% if user.has_nav('envelopes') or nav == 'envelopes' %}<a href="/s/envelopes" {% if nav == 'envelopes' %}aria-current="page"{% endif %}><span aria-hidden="true">✉️</span>Sobres</a>{% endif %}
+{% if user.has_nav('business') or nav == 'business' %}<a href="/s/business" {% if nav == 'business' %}aria-current="page"{% endif %}><span aria-hidden="true">✂</span>Negocio / Emprendimiento</a>{% endif %}
+{% if user.has_nav('ai') or nav == 'ai' %}<a href="/s/ai" {% if nav == 'ai' %}aria-current="page"{% endif %}><span aria-hidden="true">✨</span>IA</a>{% endif %}
+{% if user.has_nav('new') or nav == 'new' %}<a href="/s/new" {% if nav == 'new' %}aria-current="page"{% endif %}><span aria-hidden="true">＋</span>Agregar</a>{% endif %}
+</nav>
+</body></html>

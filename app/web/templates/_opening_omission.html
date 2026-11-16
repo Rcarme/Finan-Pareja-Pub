@@ -1,0 +1,9 @@
+{% if opening_date %}
+<link rel="stylesheet" href="/static/css/opening-omission.css">
+<fieldset class="opening-omission" data-opening-date="{{ opening_date }}">
+<legend>Gasto anterior a la foto inicial</legend>
+<label for="opening_omission"><input type="checkbox" id="opening_omission" name="opening_omission" value="1" {% if opening_omission %}checked{% endif %} aria-describedby="opening-omission-help"> Gasto que faltó en la foto inicial</label>
+<p id="opening-omission-help">Confirmo que no estaba incluido en los saldos iniciales; se descontará ahora. Conservá la fecha real. Si es de un mes anterior, se cuenta desde el mes de la foto inicial ({{ opening_date }}).{% if not simple_omission %} Podés elegir otro mes abierto en Mes de imputación.{% else %} Para elegir otro mes abierto, usá la vista completa.{% endif %}</p>
+</fieldset>
+<script nonce="{{ csp_nonce(request) }}" src="/static/js/opening-omission.js" defer></script>
+{% endif %}

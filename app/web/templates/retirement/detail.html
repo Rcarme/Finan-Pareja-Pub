@@ -1,0 +1,39 @@
+{% extends "simple/base.html" if simple_view else "base.html" %}
+{% block head %}<link rel="stylesheet" href="/static/css/spending.css">{% endblock %}
+{% block content %}
+<div class="spending-page retirement-page">
+  <a class="retirement-back" href="{{ '/s' if simple_view else '/envelopes' }}">← {{ 'Volver a Inicio' if simple_view else 'Volver a Sobres' }}</a>
+  <header class="spending-heading">
+    <div><p class="spending-eyebrow">Sobre externo · seguimiento informativo</p><h1>Retiro y ahorro externo</h1></div>
+    <form method="get" action="{{ path }}" class="spending-month"><label for="retirement-period">Mes contable<input id="retirement-period" type="month" name="period" value="{{ report.selected_period.strftime('%Y-%m') }}" required></label><input type="hidden" name="scope" value="{{ scope }}"><button type="submit">Ver mes</button></form>
+  </header>
+  <p class="spending-muted">Seguimiento de aportes brutos registrados en Finanzas. No es efectivo disponible ni el capital actual de la póliza.</p>
+  <section class="spending-card spending-total" aria-label="Histórico de aportes">
+    <p>Aportes brutos registrados · todo el histórico</p><strong class="spending-total-amount">{{ report.total_registered|currency }}</strong>
+    <div class="spending-meta"><span>{{ report.record_count }} registro{{ 's' if report.record_count != 1 else '' }}</span><span>{{ report.month_count }} mes{{ 'es' if report.month_count != 1 else '' }} con registros</span></div>
+    <p class="spending-small">El desglose por póliza reemplaza al movimiento agrupado, sin sumarlo otra vez. Los antecedentes externos completan el control sin crear gastos.</p>
+  </section>
+  <section class="spending-card retirement-policies"><h2>Aportes por póliza</h2>
+    <p class="spending-muted">Montos descontados registrados, sin intereses estimados. No representan el saldo actual de cada póliza.</p>
+    {% for policy in report.policies %}<div class="spending-category-row retirement-policy" data-policy="{{ policy.key }}"><span>{{ policy.name }}<small>{{ policy.count }} registro{{ 's' if policy.count != 1 else '' }}{% if not policy.count %} · Sin antecedentes cargados{% endif %}</small></span><strong>{{ policy.total|currency }}</strong></div>{% endfor %}
+    <p class="spending-small spending-muted">CNP 1: referencia terminada en 019. CNP 2: referencia terminada en 024. El histórico puede estar incompleto.</p>
+  </section>
+  {% if report.allocation_warning_count %}<p class="spending-note">Hay asignaciones por póliza que requieren revisión porque cambió su movimiento de origen. El desglose no se suma; si el gasto actual sigue siendo elegible, se muestra sin asignar a póliza.</p>{% endif %}
+  <section class="spending-card" aria-label="Aportes del mes elegido">
+    <h2>Mes contable {{ report.selected_period.strftime('%m/%Y') }}</h2><strong class="retirement-month-amount">{{ report.month_total|currency }}</strong>
+    <dl class="retirement-values"><div><dt>Comunes</dt><dd>{{ report.month_common|currency }}</dd></div><div><dt>A cargo de una persona</dt><dd>{{ report.month_personal|currency }}</dd></div></dl>
+  </section>
+  {% if report.personal_registered > 0 %}<p class="spending-note">Hay {{ report.personal_registered|currency }} del histórico todavía a cargo de una persona. Se conserva esa atribución: revisá el movimiento antes de considerarlo común.</p>{% endif %}
+  <section class="spending-card"><h2>Desde cuándo hay datos</h2><dl class="retirement-values"><div><dt>Primer registro</dt><dd>{{ report.first_date|date if report.first_date else 'Sin registros' }}</dd></div><div><dt>Último registro</dt><dd>{{ report.last_date|date if report.last_date else 'Sin registros' }}</dd></div></dl><p class="spending-muted">Estas fechas corresponden a lo cargado en la app. No prueban cuándo comenzó el contrato ni que estén todos los meses.</p></section>
+  <section class="spending-card"><h2>Aportes por mes contable</h2>
+    {% for month in report.months %}<a class="spending-category-row" href="{{ retirement_link(month.period.strftime('%Y-%m'), 'month') }}"><span>{{ month.period.strftime('%m/%Y') }}<small>{{ month.count }} registro{{ 's' if month.count != 1 else '' }}</small></span><strong>{{ month.total|currency }}</strong></a>{% else %}<p class="spending-empty">Todavía no hay aportes registrados en esta categoría.</p>{% endfor %}
+  </section>
+  <section class="spending-card" id="retirement-detail"><h2>Detalle de aportes</h2>
+    <form method="get" action="{{ path }}#retirement-detail" class="retirement-filter"><input type="hidden" name="period" value="{{ report.selected_period.strftime('%Y-%m') }}"><label for="retirement-scope">Mostrar<select id="retirement-scope" name="scope"><option value="all" {% if scope == 'all' %}selected{% endif %}>Todo el histórico</option><option value="month" {% if scope == 'month' %}selected{% endif %}>Solo el mes elegido</option></select></label><button type="submit">Filtrar</button></form>
+    <p class="spending-muted spending-small">{{ filtered_count }} registro{{ 's' if filtered_count != 1 else '' }} · Página {{ page }}</p>
+    {% for entry in entries %}{% if entry.transaction_id is not none %}<a class="spending-movement retirement-entry" href="{{ '/s/' if simple_view else '/transactions/' }}{{ entry.transaction_id }}">{% else %}<div class="spending-movement retirement-entry">{% endif %}<span><strong>{{ entry.description }}</strong><small>{% for policy in report.policies if policy.key == entry.policy %}{{ policy.name }}{% endfor %}</small><small>{{ entry.date|date }} · Mes {{ entry.period.strftime('%m/%Y') }}</small><small>{{ entry.account_name }} · {{ entry.user_name if entry.person_id is not none else 'Común' }}</small>{% if entry.reference %}<small>{{ 'Antecedente externo' if entry.transaction_id is none else 'Desglose del gasto' }} · {{ entry.reference }}</small>{% endif %}</span><strong>{{ entry.amount|currency }}</strong>{% if entry.transaction_id is not none %}</a>{% else %}</div>{% endif %}{% else %}<p class="spending-empty">No hay aportes que coincidan con este filtro.</p>{% endfor %}
+    {% if previous_url or next_url %}<nav class="spending-pagination" aria-label="Páginas del histórico">{% if previous_url %}<a href="{{ previous_url }}">← Anterior</a>{% endif %}{% if next_url %}<a href="{{ next_url }}">Siguiente →</a>{% endif %}</nav>{% endif %}
+  </section>
+  <aside class="spending-card spending-scope"><h2>Cómo se contabiliza</h2><p>El cobro por tarjeta ya es un egreso registrado. Este sobre externo no crea otra reserva, no suma dinero al Disponible ni simula una transferencia o aporte nuevo.</p><p>Se muestran gastos activos en pesos identificados como CNP Assurances o San Cristóbal, el agrupado de retiro confirmado y antecedentes externos documentados. Se excluyen seguros del auto, Zurich y excedentes de ahorro histórico.</p><p>Los antecedentes externos no aumentan la deuda de Visa, no cambian saldos ni cierres. Una prima ya incluida en un gasto aparece desglosada, sin duplicarse.</p><p>Los aportes brutos no permiten conocer el valor rescatable, la rentabilidad ni el capital actual de la póliza. El reporte no estima intereses ni pagos de períodos anteriores.</p></aside>
+</div>
+{% endblock %}

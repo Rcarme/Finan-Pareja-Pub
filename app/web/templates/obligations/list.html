@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+        <h2 style="font-size: 1.25rem; font-weight: 700;">Departamento</h2>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Cuotas mensuales y provisión de refuerzos en USD (RN-27 a RN-31)</span>
+    </div>
+    <form method="GET" action="/obligations" style="display: flex; gap: 0.4rem; align-items: center;">
+        <label for="filter-year" style="font-size: 0.8rem; color: var(--text-muted);">Año</label>
+        <select id="filter-year" name="year" class="js-auto-submit" style="background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.35rem 0.6rem; border-radius: 0.375rem; font-size: 0.9rem; min-height: 44px;">
+            {% for y in [2025, 2026, 2027, 2028] %}
+            <option value="{{ y }}" {% if y == summary.year %}selected{% endif %}>Año {{ y }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+{% if success_msg %}
+<div class="alert alert-success">{{ success_msg }}</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- Tarjetas de Resumen General -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+    <div class="card" style="margin-bottom: 0; padding: 1rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Pagado en el Año</span>
+        <div style="font-size: 1.2rem; font-weight: 700; color: var(--success); margin-top: 0.2rem;">
+            USD {{ summary.total_paid_usd | decimal_ar }}
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.1rem;">
+            {{ summary.total_paid_ars | currency }}
+        </div>
+    </div>
+    <div class="card" style="margin-bottom: 0; padding: 1rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Pendiente en el Año</span>
+        <div style="font-size: 1.2rem; font-weight: 700; color: var(--warning); margin-top: 0.2rem;">
+            USD {{ summary.total_pending_usd | decimal_ar }}
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.1rem;">
+            {{ summary.schedule_items | selectattr("status", "equalto", "pendiente") | list | length }} vencimientos
+        </div>
+    </div>
+</div>
+
+<!-- Tarjeta de Provisión de Refuerzos (RN-30) -->
+<div class="card" style="border-left: 4px solid var(--primary); margin-bottom: 1rem;">
+    <div class="card-header">
+        <h3 class="card-title" style="display: flex; align-items: center; gap: 0.4rem;">
+            <span>🛡️</span> Provisión de Refuerzos
+        </h3>
+        <span class="badge badge-info">Sobre Refuerzos depto</span>
+    </div>
+
+    {% if summary.provision %}
+    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.9rem;">
+        <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-muted);">Próximo refuerzo:</span>
+            <span style="font-weight: 600;">USD {{ summary.provision.target_usd | decimal_ar }} ({{ summary.provision.target_ars | currency }})</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-muted);">Saldo actual en sobre:</span>
+            <span style="font-weight: 600; color: var(--primary);">{{ summary.provision.current_balance | currency }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-muted);">Cierres restantes:</span>
+            <span>{{ summary.provision.cierres_restantes }} meses</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);">
+            <span style="font-weight: 600;">Aporte mensual sugerido:</span>
+            <span style="font-size: 1.15rem; font-weight: 700; color: var(--success);">
+                {{ summary.provision.monthly_suggested | currency }} / mes
+            </span>
+        </div>
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted); font-size: 0.85rem;">
+        No hay refuerzos pendientes próximos programados.
+    </p>
+    {% endif %}
+</div>
+
+<!-- Tarjeta de Cotización de Referencia (RN-29) -->
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header">
+        <h3 class="card-title" style="display: flex; align-items: center; gap: 0.4rem;">
+            <span>💵</span> Cotización de Referencia (RN-29)
+        </h3>
+        <button type="button" class="btn btn-outline btn-sm js-toggle-fx">Corrección excepcional</button>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
+        <div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Dólar oficial · promedio compra y venta:</span>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-color);">
+                {% if summary.latest_fx %}$ {{ summary.latest_fx.rate | fx_ar }}{% else %}Sin cotización disponible{% endif %}
+            </div>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-align: right;">
+            Fecha: {{ summary.latest_fx.date | date if summary.latest_fx else "Sin registro" }}
+            {% if summary.latest_fx %}
+            <br>Fuente: {{ 'DolarApi · oficial' if summary.latest_fx.source == 'dolarapi/oficial/promedio' else 'Corrección manual' }}
+            {% if summary.latest_fx.date.isoformat() < today_str %}
+            <br><strong>No hay una referencia publicada hoy; se conserva la última válida.</strong>
+            {% endif %}
+            {% endif %}
+            {% if summary.latest_fx and summary.latest_fx.published_at %}
+            <br>Publicado: {{ summary.latest_fx.published_at.strftime('%d/%m/%Y %H:%M %Z') }}
+            <br>Referencia guardada: {{ summary.latest_fx.fetched_at.strftime('%d/%m/%Y %H:%M %Z') if summary.latest_fx.fetched_at else 'Sin registro' }}
+            {% endif %}
+            {% if summary.latest_fx and summary.latest_fx.note %}
+            <br><em>{{ summary.latest_fx.note }}</em>
+            {% endif %}
+        </div>
+    </div>
+    <p role="status" aria-live="polite">
+        Última consulta exitosa: {{ fx_sync_status.last_success or 'Todavía no se registró una consulta exitosa' }}.
+        {% if fx_sync_status.last_error %}<br>{{ fx_sync_status.last_error }} Último intento: {{ fx_sync_status.last_attempt }}.{% endif %}
+    </p>
+    <p class="text-muted" style="font-size: 0.8rem;">Se consulta DolarApi cada hora. Si no hay un dato nuevo se conserva la última referencia con su fecha. Es orientativa: no modifica pagos ni cierres anteriores.</p>
+
+    <!-- Formulario para cargar cotización -->
+    <div id="fx-form" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+        <form method="POST" action="/obligations/fx-rate" style="display: flex; flex-direction: column; gap: 0.6rem;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div>
+                    <label for="fx-date" style="font-size: 0.75rem; color: var(--text-muted);">Fecha</label>
+                    <input id="fx-date" type="date" name="date" required value="{{ today_str }}" style="width: 100%; min-height: 44px; background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.4rem; border-radius: 0.375rem; font-size: 0.85rem;">
+                </div>
+                <div>
+                    <label for="fx-rate" style="font-size: 0.75rem; color: var(--text-muted);">Cotización ($ ARS)</label>
+                    <input id="fx-rate" type="text" name="rate" inputmode="decimal" required placeholder="1.500,00" style="width: 100%; min-height: 44px; background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.4rem; border-radius: 0.375rem; font-size: 0.85rem;">
+                </div>
+            </div>
+            <div>
+                <label for="fx-note" style="font-size: 0.75rem; color: var(--text-muted);">Motivo de la corrección</label>
+                <input id="fx-note" type="text" name="note" required placeholder="Por qué necesitás corregir la referencia oficial" style="width: 100%; min-height: 44px; background-color: var(--input-bg); border: 1px solid var(--border); color: var(--text-color); padding: 0.4rem; border-radius: 0.375rem; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary btn-sm js-toggle-fx">Cancelar</button>
+                <button type="submit" class="btn btn-primary btn-sm">Guardar cotización</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Historial reciente de cotizaciones (RN-29) -->
+    {% if summary.fx_history %}
+    <div style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Historial reciente:</span>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
+            {% for fx in summary.fx_history %}
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                <span>{{ fx.date | date }} · {{ 'Automática' if fx.source == 'dolarapi/oficial/promedio' else 'Manual' }}</span>
+                <span>$ {{ fx.rate | fx_ar }} {% if fx.note %}({{ fx.note }}){% endif %}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Cronograma de Vencimientos (RN-27) -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Cronograma {{ summary.year }}</h3>
+        <form method="POST" action="/obligations/generate-schedule" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <input type="hidden" name="year" value="{{ summary.year }}">
+            <button type="submit" class="btn btn-outline btn-sm" title="Generar ítems pendientes del año">Regenerar</button>
+        </form>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+        {% for item in summary.schedule_items %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.5rem; border-radius: 0.5rem; background-color: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
+            <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span style="font-weight: 600; font-size: 0.95rem;">
+                        {{ item.due_period.strftime("%B %Y") | capitalize }}
+                    </span>
+                    {% if item.kind == 'refuerzo' %}
+                    <span class="badge badge-user" style="background-color: rgba(168, 85, 247, 0.2); color: #c084fc;">Refuerzo</span>
+                    {% else %}
+                    <span class="badge badge-info">Cuota</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                    USD {{ item.usd_amount | decimal_ar }}
+                    {% if item.status == 'pagado' and item.transaction_id %}
+                    • Pagado
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="text-align: right; display: flex; align-items: center; gap: 0.6rem;">
+                {% if item.status == 'pagado' %}
+                <span class="badge badge-success">Pagado</span>
+                {% else %}
+                <a href="/obligations/{{ item.id }}/pay" class="btn btn-primary btn-sm" style="min-height: 44px; padding: 0 0.8rem;">
+                    Pagar
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Agregar vencimiento manual (T12.14) -->
+    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">+ Agregar vencimiento manual (USD)</h4>
+        <form method="POST" action="/obligations/items" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 0.5rem; align-items: end;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+            <div>
+                <label for="ob-due-period" class="form-label" style="font-size: 0.75rem;">Período</label>
+                <input id="ob-due-period" type="month" name="due_period" class="form-control" required value="{{ summary.year }}-12">
+            </div>
+            <div>
+                <label for="ob-kind" class="form-label" style="font-size: 0.75rem;">Tipo</label>
+                <select id="ob-kind" name="kind" class="form-control">
+                    <option value="refuerzo">Refuerzo</option>
+                    <option value="cuota">Cuota</option>
+                </select>
+            </div>
+            <div>
+                <label for="ob-usd-amount" class="form-label" style="font-size: 0.75rem;">Monto (USD)</label>
+                <input id="ob-usd-amount" type="text" name="usd_amount" inputmode="decimal" class="form-control" placeholder="2.500,00" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="min-height: 44px;">+ Agregar</button>
+        </form>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce(request) }}">
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.js-toggle-fx')) {
+        var el = document.getElementById('fx-form');
+        if (el) {
+            el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+        }
+    }
+});
+</script>
+{% endblock %}

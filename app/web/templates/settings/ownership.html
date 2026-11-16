@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Apertura del dinero</h1>
+{% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+{% if ownership %}
+<section class="card"><p>Apertura aplicada el {{ ownership.opening_date | date }}.</p>
+<p>El historial anterior permanece intacto. No vuelvas a cargar las mismas compras o ingresos.</p>
+<a href="/">Ver saldos</a></section>
+<section class="card"><h2>Convertir ahorro en dólares a pesos</h2><p>Usá esta opción después de vender dólares realmente. Conserva el ahorro reservado y no registra un ingreso nuevo. La cotización oficial de referencia no reemplaza el importe que recibiste.</p>
+<form method="post" class="ownership-form" action="/settings/ownership/convert"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+<label for="usd_origin">Cuenta con dólares vendidos</label><select id="usd_origin" name="usd_account_id" required>{% for account in accounts if account.currency == 'USD' and account.type != 'credit' %}<option value="{{ account.id }}">{{ account.name }}</option>{% endfor %}</select>
+<label for="ars_destination">Cuenta donde recibiste los pesos</label><select id="ars_destination" name="ars_account_id" required>{% for account in accounts if account.currency == 'ARS' and account.type != 'credit' %}<option value="{{ account.id }}">{{ account.name }}</option>{% endfor %}</select>
+<label for="sold_usd">Dólares vendidos</label><input id="sold_usd" name="usd_amount" inputmode="decimal" required>
+<label for="received_ars">Pesos realmente recibidos</label><input id="received_ars" name="ars_received" inputmode="decimal" required>
+<label for="conversion_period">Período abierto</label><input id="conversion_period" name="period" type="month" required>
+<label for="conversion_reason">Motivo y referencia</label><textarea id="conversion_reason" name="reason" required></textarea>
+<button class="btn" type="submit">Registrar conversión real</button></form></section>
+<section class="card"><h2>Corregir una estimación inicial</h2><p>Ingresá diferencias, no saldos finales. Si una cuenta tenía $50.000 estimados y tiene $60.000 reales personales, la diferencia física y personal es +$10.000. No es un ingreso nuevo.</p>
+<form method="post" class="ownership-form" action="/settings/ownership/adjust"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ idem_token() }}">
+<label for="adjust_period">Período abierto del ajuste</label><input id="adjust_period" type="month" name="period" required>
+<label for="adjust_account">Ubicación que corregís</label><select id="adjust_account" name="account_id"><option value="">Sin ajuste físico</option>{% for account in accounts %}<option value="{{ account.id }}">{{ account.name }} · {{ account.currency }}</option>{% endfor %}</select>
+<label for="adjust_user">Asignación personal que corregís</label><select id="adjust_user" name="personal_user_id"><option value="">Sin ajuste personal</option>{% for person in users %}<option value="{{ person.id }}">{{ person.display_name }}</option>{% endfor %}</select>
+<label for="adjust_currency">Moneda</label><select id="adjust_currency" name="currency"><option value="ARS">Pesos</option><option value="USD">Dólares</option></select>
+<label for="physical_delta">Diferencia de saldo físico</label><input id="physical_delta" name="physical_delta" inputmode="decimal" value="0" required>
+<label for="personal_delta">Diferencia de asignación personal</label><input id="personal_delta" name="personal_delta" inputmode="decimal" value="0" required>
+<label for="savings_delta">Diferencia del ahorro reservado</label><input id="savings_delta" name="savings_delta" inputmode="decimal" value="0" required>
+<label for="adjust_reason">Motivo</label><textarea id="adjust_reason" name="reason" required></textarea>
+<p>Los ajustes quedan auditados. Para una deuda, una diferencia negativa aumenta lo pendiente.</p><button class="btn" type="submit">Registrar corrección auditada</button></form></section>
+{% else %}
+<p>Esta pantalla registra una foto inicial, no un ingreso ni un pago de tarjeta. Elegí las cuentas reales y verificá que ninguna deuda se esté sumando dos veces.</p>
+<section class="card"><h2>Referencia conversada, todavía sin aplicar</h2>
+<p>Ejemplo: 10/10/2026: Banco $250.000, Efectivo $50.000 estimados.</p>
+<p>Ahorro separado para el auto: $573.807,53 y USD 377. Colchón inicial: $0.</p>
+<p>Ejemplo: Deuda tarjeta $50.000.</p>
+<p>El ahorro guardado aparte necesita una ubicación real, también en USD. Configurá cuentas y titulares antes de completar esta foto.</p></section>
+<form method="get" class="ownership-form" action="/settings/ownership"><label for="review_date">Fecha para revisar cargos previos</label><input id="review_date" name="opening_date" type="date" value="{{ opening_date }}" required><button class="btn" type="submit">Revisar fecha</button></form>
+<form method="post" action="/settings/ownership" class="card ownership-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="idempotency_token" value="{{ form_values.get('idempotency_token') or idem_token() }}">
+<label for="opening_date">Fecha de la foto</label><input id="opening_date" type="date" name="opening_date" value="{{ opening_date }}" required>
+<h2>Saldos reales por ubicación</h2><p>Ingresá deuda de tarjetas como importe negativo. Un saldo en USD se escribe en USD, sin convertir.</p>
+{% for account in accounts %}<div class="form-group"><label for="account_{{ account.id }}">{{ account.name }} · {{ account.currency }}{% if account.type == 'credit' %} · tarjeta{% endif %}</label>
+<input class="form-control" id="account_{{ account.id }}" name="account_{{ account.id }}" inputmode="decimal" value="{{ form_values.get('account_' ~ account.id, '') }}" required>
+{% if account.type == "credit" and account.currency == "ARS" %}<label for="debt_usd_{{ account.id }}">Deuda adicional en USD de {{ account.name }} (positiva)</label><input id="debt_usd_{{ account.id }}" name="debt_usd_{{ account.id }}" inputmode="decimal" value="{{ form_values.get('debt_usd_' ~ account.id, '0,00') }}" required>{% endif %}
+<label><input type="checkbox" name="estimated_{{ account.id }}" value="yes" {% if form_values.get('estimated_' ~ account.id) == 'yes' %}checked{% endif %}> Saldo estimado</label></div>{% endfor %}
+<h2>Cargos personales anteriores pendientes</h2><p>Marcá solamente los gastos que todavía deben descontarse de una parte personal al cierre. Un gasto ya descontado no se marca. La cuenta de origen no demuestra si fue descontado.</p>
+{% for tx in pending_charges %}<label><input type="checkbox" name="pending_charge" value="{{ tx.id }}" {% if tx.id|string in pending_selected %}checked{% endif %}>{{ tx.date | date }} · {{ tx.description }} · {{ tx.amount | currency }} · a cargo de {{ users_map.get(tx.charged_to_user_id, "Integrante") }}</label>{% else %}<p>No hay cargos personales registrados para revisar.</p>{% endfor %}
+<h2>Dinero personal anterior</h2><p>Sumá las ubicaciones personales de cada integrante. Este importe ya le pertenece y no se vuelve a repartir.</p>
+{% for person in users %}<div class="form-group"><label for="personal_{{ person.id }}">{{ person.display_name }} · ARS</label><input class="form-control" id="personal_{{ person.id }}" name="personal_{{ person.id }}" inputmode="decimal" value="{{ form_values.get('personal_' ~ person.id, '') }}" required></div>{% endfor %}
+<label for="savings_ars">Ahorro anterior en pesos</label><input id="savings_ars" name="savings_ars" inputmode="decimal" value="{{ form_values.get('savings_ars', '573807,53') }}" required>
+<label for="savings_usd">Ahorro anterior en dólares</label><input id="savings_usd" name="savings_usd" inputmode="decimal" value="{{ form_values.get('savings_usd', '377,00') }}" required>
+<label for="reason">Motivo y aclaraciones</label><textarea id="reason" name="reason" required>{{ form_values.get('reason', 'Foto inicial; saldos estimados sujetos a conciliación.') }}</textarea>
+<p>La deuda pendiente puede dejar negativo el fondo del hogar si todo el efectivo está asignado como personal. La app muestra esa diferencia para revisar cómo financiarla.</p>
+<label><input type="checkbox" name="confirm" value="yes" {% if form_values.get('confirm') == 'yes' %}checked{% endif %} required> Revisé las cuentas, deudas, reservas y dinero personal; confirmo aplicar esta foto.</label>
+<button type="submit" class="btn">Aplicar apertura auditada</button>
+</form>
+{% endif %}
+{% endblock %}

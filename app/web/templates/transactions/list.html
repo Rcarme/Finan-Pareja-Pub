@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 700;">Movimientos</h2>
+    <a href="/transactions/new" class="btn btn-primary btn-sm">+ Nuevo</a>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="padding: 1rem; margin-bottom: 1rem;">
+    <form method="GET" action="/transactions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+        <div>
+            <label class="form-label" for="filter-period" style="font-size: 0.75rem;">Período</label>
+            <input id="filter-period" type="month" name="period" value="{{ current_period }}" class="form-control js-auto-submit" style="min-height: 44px; padding: 0.4rem; font-size: 0.85rem;">
+        </div>
+        <div>
+            <label class="form-label" for="filter-kind" style="font-size: 0.75rem;">Tipo</label>
+            <select id="filter-kind" name="kind" class="form-control js-auto-submit" style="min-height: 44px; padding: 0.4rem; font-size: 0.85rem;">
+                <option value="">Todos</option>
+                <option value="expense" {% if filter_kind == 'expense' %}selected{% endif %}>Gastos</option>
+                <option value="income" {% if filter_kind == 'income' %}selected{% endif %}>Ingresos</option>
+                <option value="transfer" {% if filter_kind == 'transfer' %}selected{% endif %}>Transferencias</option>
+                <option value="distribution" {% if filter_kind == 'distribution' %}selected{% endif %}>Retiros</option>
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="filter-account" style="font-size: 0.75rem;">Cuenta</label>
+            <select id="filter-account" name="account_id" class="form-control js-auto-submit" style="min-height: 44px; padding: 0.4rem; font-size: 0.85rem;">
+                <option value="">Todas</option>
+                {% for acc in accounts %}
+                <option value="{{ acc.id }}" {% if filter_account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="filter-status" style="font-size: 0.75rem;">Estado</label>
+            <select id="filter-status" name="status" class="form-control js-auto-submit" style="min-height: 44px; padding: 0.4rem; font-size: 0.85rem;">
+                <option value="active" {% if filter_status == 'active' %}selected{% endif %}>Solo activos</option>
+                <option value="all" {% if filter_status == 'all' %}selected{% endif %}>Todos (incluye anulados)</option>
+                <option value="voided" {% if filter_status == 'voided' %}selected{% endif %}>Solo anulados</option>
+            </select>
+        </div>
+        <div style="grid-column: span 2; display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label class="form-label" for="filter-q" style="font-size: 0.75rem;">Buscar en descripción</label>
+                <input id="filter-q" type="text" name="q" value="{{ filter_q }}" placeholder="Ej. supermercado, 100%..." class="form-control" style="min-height: 44px; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm" style="min-height: 44px;">Buscar</button>
+        </div>
+    </form>
+</div>
+
+<!-- Resumen de Totales del Filtro -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+    <div style="background-color: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 0.5rem; padding: 0.6rem 0.75rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Ingresos del filtro</span>
+        <span style="font-size: 1.1rem; font-weight: 700; color: var(--success);">{{ total_incomes | currency }}</span>
+    </div>
+    <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.5rem; padding: 0.6rem 0.75rem;">
+        <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Gastos del filtro</span>
+        <span style="font-size: 1.1rem; font-weight: 700; color: var(--danger);">{{ total_expenses | currency }}</span>
+    </div>
+</div>
+
+<!-- Lista de Movimientos -->
+<div class="card" style="padding: 0.5rem;">
+    {% if transactions %}
+    <div style="display: flex; flex-direction: column;">
+        {% for tx in transactions %}
+        <a href="/transactions/{{ tx.id }}" style="text-decoration: none; color: inherit; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.5rem; border-bottom: 1px solid var(--border); {% if tx.status == 'voided' %}opacity: 0.5; background-color: rgba(0, 0, 0, 0.2);{% endif %}">
+            <div style="display: flex; flex-direction: column; gap: 0.2rem; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <span style="font-weight: 600; font-size: 0.95rem;">{{ tx.description }}</span>
+                    {% if tx.status == 'voided' %}
+                    <span class="badge badge-voided">Anulado</span>
+                    {% endif %}
+                    {% if tx.kind == 'transfer' %}
+                    <span class="badge badge-info">Transferencia</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                    <span>{{ tx.date | date }}</span>
+                    <span>•</span>
+                    <span>{{ tx.account_name }}{% if tx.to_account_name %} → {{ tx.to_account_name }}{% endif %}</span>
+                    {% if tx.category_name %}
+                    <span>•</span>
+                    <span>{{ tx.category_name }}</span>
+                    {% endif %}
+                    {% if tx.charged_to_name %}
+                    <span class="badge badge-user">A cargo: {{ tx.charged_to_name }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="font-weight: 700; font-size: 1rem; text-align: right; margin-left: 0.5rem; white-space: nowrap; {% if tx.status == 'voided' %}text-decoration: line-through; color: var(--text-muted);{% elif tx.kind == 'income' %}color: var(--success);{% else %}color: var(--danger);{% endif %}">
+                {% if tx.kind == 'income' %}+{% else %}-{% endif %} {{ tx.amount | currency }}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color: var(--text-muted); text-align: center; padding: 2rem 0; font-size: 0.9rem;">
+        No se encontraron movimientos con los filtros seleccionados.
+    </p>
+    {% endif %}
+</div>
+<nav aria-label="Páginas de movimientos" style="display:flex; gap:1rem; align-items:center; margin-top:1rem; flex-wrap:wrap;">
+    {% if previous_url %}<a class="btn btn-outline" href="{{ previous_url }}">Anterior</a>{% endif %}
+    <span>Página {{ page }} · {{ total_count }} movimientos del filtro</span>
+    {% if next_url %}<a class="btn btn-outline" href="{{ next_url }}">Siguiente</a>{% endif %}
+</nav>
+{% endblock %}
