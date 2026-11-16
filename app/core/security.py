@@ -18,11 +18,12 @@ from app.core.config import settings
 
 # Estructura en memoria para rate limiting:
 # - (ip, username) -> list[datetime] (límite específico por IP/usuario)
-# - username -> list[datetime] (límite global por usuario contra ataques distribuidos)
+# - username -> list[tuple[str, datetime]] (límite distribuido multi-IP contra fuerza bruta masiva)
 FAILED_LOGIN_ATTEMPTS: dict[tuple[str, str], list[datetime]] = {}
-FAILED_USERNAME_ATTEMPTS: dict[str, list[datetime]] = {}
+FAILED_USERNAME_ATTEMPTS: dict[str, list[tuple[str, datetime]]] = {}
 MAX_ATTEMPTS = 5
-MAX_GLOBAL_USER_ATTEMPTS = 10
+MAX_GLOBAL_USER_ATTEMPTS = 25
+MIN_DISTINCT_IPS_FOR_GLOBAL_BLOCK = 3
 WINDOW_MINUTES = 15
 
 
@@ -153,7 +154,9 @@ def _purge_expired_attempts(now: datetime) -> None:
             FAILED_LOGIN_ATTEMPTS.pop(k, None)
 
     for user_key in list(FAILED_USERNAME_ATTEMPTS.keys()):
-        recent_user = [t for t in FAILED_USERNAME_ATTEMPTS[user_key] if t > cutoff]
+        recent_user = [
+            (att_ip, t) for att_ip, t in FAILED_USERNAME_ATTEMPTS[user_key] if t > cutoff
+        ]
         if recent_user:
             FAILED_USERNAME_ATTEMPTS[user_key] = recent_user
         else:
@@ -161,7 +164,7 @@ def _purge_expired_attempts(now: datetime) -> None:
 
 
 def is_rate_limited(ip: str, username: str) -> bool:
-    """Verifica si un usuario/IP excedió el límite de intentos por IP o global por usuario."""
+    """Verifica si un usuario/IP excedió el límite de intentos por IP o distribuido multi-IP."""
     user_key = username.lower().strip()
     key = (ip, user_key)
     now = datetime.now(UTC)
@@ -170,7 +173,11 @@ def is_rate_limited(ip: str, username: str) -> bool:
     if len(recent_ip_user) >= MAX_ATTEMPTS:
         return True
     recent_global_user = FAILED_USERNAME_ATTEMPTS.get(user_key, [])
-    return len(recent_global_user) >= MAX_GLOBAL_USER_ATTEMPTS
+    if len(recent_global_user) >= MAX_GLOBAL_USER_ATTEMPTS:
+        distinct_ips = {att_ip for att_ip, _ in recent_global_user}
+        if len(distinct_ips) >= MIN_DISTINCT_IPS_FOR_GLOBAL_BLOCK:
+            return True
+    return False
 
 
 def record_failed_attempt(ip: str, username: str) -> None:
@@ -185,7 +192,7 @@ def record_failed_attempt(ip: str, username: str) -> None:
     FAILED_LOGIN_ATTEMPTS[key] = recent_attempts
 
     recent_user_attempts = FAILED_USERNAME_ATTEMPTS.get(user_key, [])
-    recent_user_attempts.append(now)
+    recent_user_attempts.append((ip, now))
     FAILED_USERNAME_ATTEMPTS[user_key] = recent_user_attempts
 
 

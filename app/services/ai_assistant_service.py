@@ -51,6 +51,15 @@ def get_effective_gemini_api_key(db: Session) -> str | None:
             try:
                 decrypted = decrypt_secret(val)
                 if decrypted:
+                    # Re-cifrado transparente en lectura: si no es Fernet v2 con HKDF,
+                    # se migra y persiste automáticamente al estándar moderno
+                    if not val.startswith("enc:v2:"):
+                        from app.services.setup_service import set_system_setting
+
+                        set_system_setting(
+                            db, "gemini_api_key", {"api_key": encrypt_secret(decrypted)}
+                        )
+                        db.commit()
                     return decrypted
             except Exception:
                 logger.warning(

@@ -80,12 +80,12 @@ docker compose up -d
 2. El sistema detectará que es la primera ejecución y te llevará al **Asistente de Bienvenida (`/setup`)**.
 3. Ingresen los nombres de usuario y contraseñas de la pareja, elijan su moneda local y ¡listo! Ya pueden comenzar a registrar sus finanzas.
 
-#### 🧪 Carga Rápida de Datos Demo (Evaluación)
-Si querés probar la aplicación con datos ficticios sin configurar todo manualmente:
+#### 🧪 Carga Rápida de Datos Demo (Entorno de Desarrollo)
+Si estás probando localmente y querés sembrar datos ficticios sin configurar todo a mano:
 ```bash
 python scripts/seed_demo.py
 ```
-Esto creará dos usuarios (`alex` / `DemoPassword1234!` y `sam` / `DemoPassword5678!`) con cuentas, categorías y transacciones de muestra.
+*(Bloqueado estrictamente en producción. Genera contraseñas aleatorias seguras impresas en consola al momento de la ejecución).*
 
 ---
 

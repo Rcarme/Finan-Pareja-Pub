@@ -54,6 +54,14 @@ def test_csrf_endpoint_rejection_without_token():
     Base.metadata.create_all(bind=get_engine())
     client = TestClient(app)
 
+    # Limpiar estado previo para asegurar que no esté onboarded antes de probar /setup
+    session_init = get_session_factory()()
+    try:
+        session_init.query(User).delete()
+        session_init.commit()
+    finally:
+        session_init.close()
+
     # 1. Petición POST a /setup sin token CSRF -> rechazada con status 400 y mensaje de seguridad
     resp_setup = client.post(
         "/setup",
@@ -68,6 +76,7 @@ def test_csrf_endpoint_rejection_without_token():
             "currency": "EUR",
             "split_pct": 50,
         },
+        follow_redirects=False,
     )
     assert resp_setup.status_code == 400
     assert "token de seguridad" in resp_setup.text.lower()

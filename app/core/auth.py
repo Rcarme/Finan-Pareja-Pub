@@ -96,7 +96,11 @@ def get_active_session(db: Session, raw_token: str) -> tuple[SessionModel, User]
     session_record, user = result
 
     # La revocación se consulta siempre; la renovación se agrupa para evitar escrituras por asset.
-    if session_record.last_seen is None or session_record.last_seen <= now - timedelta(minutes=5):
+    last_seen = session_record.last_seen
+    if last_seen is not None and last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=UTC)
+
+    if last_seen is None or last_seen <= now - timedelta(minutes=5):
         session_record.last_seen = now
         session_record.expires_at = now + timedelta(days=SESSION_DURATION_DAYS)
         db.commit()

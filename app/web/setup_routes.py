@@ -33,19 +33,14 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
     from app.web.app import templates
 
     csrf_token = generate_csrf_token()
-    query_token = request.query_params.get("token", "")
-    error_msg = None
-    if settings.SETUP_TOKEN and query_token and not _is_setup_token_valid(query_token):
-        error_msg = "El token de instalación proporcionado en el enlace es inválido."
-
     response = templates.TemplateResponse(
         request=request,
         name="setup.html",
         context={
             "csrf_token": csrf_token,
-            "error": error_msg,
+            "error": None,
             "require_setup_token": bool(settings.SETUP_TOKEN),
-            "setup_token": query_token if _is_setup_token_valid(query_token) else "",
+            "setup_token": "",
         },
     )
     response.set_cookie(

@@ -102,7 +102,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             user = None
             session_record = None
 
-            if session_token and (not is_public or path == "/login"):
+            if session_token and (not is_public or path in ("/login", "/healthz")):
                 auth_data = await run_in_threadpool(_load_session, session_token)
                 if auth_data:
                     session_record, user = auth_data
@@ -124,16 +124,17 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 for name, value in response.raw_headers
             )
             if session_token and session_record is not None and not has_session_cookie:
+                exp = session_record.expires_at
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=UTC)
                 response.set_cookie(
                     "session_id",
                     session_token,
                     httponly=True,
                     samesite="lax",
                     secure=secure_cookies(),
-                    max_age=max(
-                        0, int((session_record.expires_at - datetime.now(UTC)).total_seconds())
-                    ),
-                    expires=session_record.expires_at.astimezone(UTC),
+                    max_age=max(0, int((exp - datetime.now(UTC)).total_seconds())),
+                    expires=exp.astimezone(UTC),
                 )
             protect_response(request, response)
             return response

@@ -145,7 +145,7 @@ def healthz(request: Request) -> dict[str, Any] | JSONResponse:
     """Endpoint de salud para monitorización y healthcheck (RN-38, ARCHITECTURE.md §5, §6).
 
     Provee un chequeo mínimo sin revelar metadata a visitantes anónimos; detalla
-    el estado de backup y entorno únicamente a usuarios autenticados.
+    el estado de backup y entorno únicamente a usuarios autenticados mediante sesión activa.
     """
     db_ok = check_db_connection()
     is_authenticated = bool(getattr(request.state, "user", None))

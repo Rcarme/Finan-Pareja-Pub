@@ -79,8 +79,8 @@ def test_distributed_rate_limiting_by_username():
     clear_failed_attempts("1.1.1.1", username)
     assert not is_rate_limited("1.1.1.1", username)
 
-    # Simular 10 intentos desde 10 IPs distintas (1 intento por IP)
-    for i in range(10):
+    # Simular 25 intentos desde 25 IPs distintas (1 intento por IP)
+    for i in range(25):
         diff_ip = f"192.168.1.{i + 1}"
         record_failed_attempt(diff_ip, username)
 
@@ -90,3 +90,54 @@ def test_distributed_rate_limiting_by_username():
     # Tras un login exitoso, se limpia el bloqueo global
     clear_failed_attempts("10.0.0.1", username)
     assert not is_rate_limited("10.0.0.1", username)
+
+
+def test_healthz_anonymous_vs_authenticated():
+    """Verifica que /healthz solo detalle backups y ambiente si hay una sesión activa."""
+    from starlette.testclient import TestClient
+
+    from app.core.auth import create_session
+    from app.core.db import get_engine, get_session_factory
+    from app.models.auth import User
+    from app.models.base import Base
+    from app.web.app import app
+
+    Base.metadata.create_all(bind=get_engine())
+    session = get_session_factory()()
+    try:
+        user = session.query(User).filter(User.username == "health_test_user").first()
+        if not user:
+            user = User(
+                username="health_test_user",
+                display_name="Health Tester",
+                password_hash="dummy_hash_for_testing",
+                active=True,
+                ui_mode="simple",
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+
+        raw_token, _ = create_session(session, user.id, "pytest-agent")
+    finally:
+        session.close()
+
+    client = TestClient(app)
+
+    # 1. Anónimo: solo status mínimo
+    resp_anon = client.get("/healthz")
+    assert resp_anon.status_code == 200
+    data_anon = resp_anon.json()
+    assert data_anon == {"status": "ok"}
+    assert "environment" not in data_anon
+    assert "backup" not in data_anon
+
+    # 2. Con sesión activa: reporte diagnóstico completo
+    client.cookies.set("session_id", raw_token)
+    resp_auth = client.get("/healthz")
+    assert resp_auth.status_code == 200
+    data_auth = resp_auth.json()
+    assert data_auth["status"] == "ok"
+    assert "environment" in data_auth
+    assert "backup" in data_auth
+    assert data_auth["database"] == "connected"
