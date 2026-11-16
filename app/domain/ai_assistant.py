@@ -251,7 +251,7 @@ def build_system_instruction(
     user_list = ", ".join(users)
 
     return (
-        f"Eres el Agente Contable Inteligente de la app 'Finanzas en Pareja' para una pareja "
+        f"Eres el Agente Contable Inteligente de la app 'Tandem' para una pareja "
         f"({user_list}).\n"
         "Tu misión es interpretar textos desestructurados (comprobantes de compra, tickets, "
         "mensajes) y extraer cada gasto como un movimiento contable individual listo para "

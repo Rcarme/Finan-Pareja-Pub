@@ -1,4 +1,4 @@
-# 💑 Finanzas en Pareja (Couple Finance OS)
+# 🚲 Tandem — Finanzas en Pareja (Couple Finance)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
@@ -14,7 +14,7 @@
 <a name="english"></a>
 ## 🇬🇧 English
 
-**Finanzas en Pareja (Couple Finance OS)** is a shared domestic accounting and financial management web application built for couples and modern households.
+**Tandem** is a shared domestic accounting and financial management web application built for couples and modern households.
 
 It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), append-only immutable auditing, native dual-currency management, **AI Assistant with Voice Dictation (Google Gemini + Web Speech API)**, and automated encrypted daily backups using `age` with Grandfather-Father-Son (GFS) retention.
 
@@ -56,7 +56,7 @@ docker compose up -d
 <a name="español"></a>
 ## 🇦🇷 Español
 
-**Finanzas en Pareja** es una plataforma web completa de contabilidad doméstica compartida, diseñada específicamente para parejas y hogares que desean transparencia financiera, equidad y simplicidad en el día a día.
+**Tandem** es una plataforma web completa de contabilidad doméstica compartida, diseñada específicamente para parejas y hogares que desean transparencia financiera, equidad y simplicidad en el día a día.
 
 Incluye una **UI dual** (Modo Simple Mobile-First y Modo Completo de escritorio), contabilidad inmutable basada en partida doble simplificada, soporte bimonetario nativo, **asistente de IA con dictado por voz (Google Gemini + Web Speech API)** y un sistema de **backups automáticos cifrados con age** bajo esquema de rotación abuelo-padre-hijo (GFS).
 

@@ -1,6 +1,6 @@
 # Arquitectura del Sistema (ARCHITECTURE.md)
 
-Este documento describe formalmente la arquitectura de software, el modelo de datos, la seguridad y los principios de contabilidad del sistema **Finanzas en Pareja**.
+Este documento describe formalmente la arquitectura de software, el modelo de datos, la seguridad y los principios de contabilidad del sistema **Tandem** (Finanzas en Pareja).
 
 ---
 

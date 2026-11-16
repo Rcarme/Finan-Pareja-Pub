@@ -1,6 +1,6 @@
 # Manual de Operaciones y Mantenimiento (RUNBOOK.md)
 
-Instrucciones paso a paso para el despliegue, mantenimiento, backups y recuperación ante desastres de **Finanzas en Pareja**.
+Instrucciones paso a paso para el despliegue, mantenimiento, backups y recuperación ante desastres de **Tandem** (Finanzas en Pareja).
 
 ---
 

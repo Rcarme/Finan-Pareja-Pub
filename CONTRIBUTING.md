@@ -1,6 +1,6 @@
 # Guía de Contribución / Contributing Guide
 
-¡Gracias por tu interés en contribuir a **Finanzas en Pareja**! Este proyecto es de código abierto bajo la licencia MIT y busca ayudar a parejas y hogares de todo el mundo a gestionar su economía de forma transparente, equitativa y segura.
+¡Gracias por tu interés en contribuir a **Tandem** (Finanzas en Pareja)! Este proyecto es de código abierto bajo la licencia MIT y busca ayudar a parejas y hogares de todo el mundo a gestionar su economía de forma transparente, equitativa y segura.
 
 ---
 

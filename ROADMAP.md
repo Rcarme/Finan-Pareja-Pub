@@ -1,6 +1,6 @@
-# Hoja de Ruta (Roadmap) - Finanzas en Pareja
+# Hoja de Ruta (Roadmap) - Tandem
 
-Este documento resume las iniciativas, mejoras arquitectónicas y funcionalidades planificadas para las próximas versiones de **Finanzas en Pareja**.
+Este documento resume las iniciativas, mejoras arquitectónicas y funcionalidades planificadas para las próximas versiones de **Tandem** (Finanzas en Pareja).
 
 ---
 
