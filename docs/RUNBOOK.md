@@ -13,8 +13,8 @@ Instrucciones paso a paso para el despliegue, mantenimiento, backups y recuperac
 ### 1.2. Paso a Paso
 1. Clonar el repositorio:
    ```bash
-   git clone https://github.com/Rcarme/Finan-Pareja-Pub.git
-   cd Finan-Pareja-Pub
+   git clone https://github.com/Rcarme/tandem.git
+   cd tandem
    ```
 2. Generar el archivo `.env`:
    ```bash

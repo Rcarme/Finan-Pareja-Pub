@@ -1,5 +1,5 @@
 /**
- * Service Worker para Finanzas en Común (F09).
+ * Service Worker para Tandem (F09).
  * 
  * Reglas arquitectónicas del proyecto:
  * 1. Solo App Shell y assets estáticos: NUNCA cachear datos contables, saldos ni información sensible.
@@ -8,7 +8,7 @@
  * 3. En caso de navegación sin conexión, sirve la página de contingencia /offline.
  */
 
-const CACHE_NAME = 'finanzas-shell-v2';
+const CACHE_NAME = 'tandem-shell-v2';
 const PRECACHE_ASSETS = [
     '/offline',
     '/static/icons/icon-192.png',

@@ -1,5 +1,5 @@
 [project]
-name = "finan-pareja-pub"
+name = "tandem"
 version = "1.0.0"
 description = "Plataforma web de finanzas compartidas y contabilidad en pareja con Asistente IA"
 readme = "README.md"

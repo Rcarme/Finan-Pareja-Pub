@@ -1,6 +1,6 @@
 # Guía Operativa: HTTPS y PWA con Tailscale (`ops/tailscale.md`)
 
-Esta guía describe cómo desplegar y acceder a la aplicación **Finanzas en Común** de forma segura en la red privada de la pareja (tailnet) utilizando HTTPS válido emitido por Tailscale, permitiendo la instalación completa como Progressive Web App (PWA) en celulares Android e iOS.
+Esta guía describe cómo desplegar y acceder a la aplicación **Tandem** (Finanzas en Pareja) de forma segura en la red privada de la pareja (tailnet) utilizando HTTPS válido emitido por Tailscale, permitiendo la instalación completa como Progressive Web App (PWA) en celulares Android e iOS.
 
 ---
 

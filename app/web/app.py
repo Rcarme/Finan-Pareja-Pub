@@ -59,8 +59,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="Finanzas en Común",
-    description="Gestión compartida de finanzas para pareja",
+    title="Tandem",
+    description="Gestión compartida de finanzas en pareja",
     version="1.0.0",
     lifespan=lifespan,
 )

@@ -1,7 +1,7 @@
 {
-  "name": "Finanzas en Común",
-  "short_name": "Finanzas",
-  "description": "Gestión compartida de finanzas para pareja",
+  "name": "Tandem — Finanzas en Pareja",
+  "short_name": "Tandem",
+  "description": "Gestión compartida de finanzas en pareja",
   "id": "/",
   "start_url": "/",
   "scope": "/",

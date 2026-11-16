@@ -54,4 +54,4 @@ Brindar una plataforma de finanzas colaborativas doméstica, privada, libre de t
 ---
 
 ## 🤝 Cómo Contribuir
-¿Te interesa liderar o colaborar en alguna de estas iniciativas? Consultá nuestra [Guía de Contribución](CONTRIBUTING.md) o abrí una propuesta en los [GitHub Discussions / Issues](https://github.com/Rcarme/Finan-Pareja-Pub/issues).
+¿Te interesa liderar o colaborar en alguna de estas iniciativas? Consultá nuestra [Guía de Contribución](CONTRIBUTING.md) o abrí una propuesta en los [GitHub Discussions / Issues](https://github.com/Rcarme/tandem/issues).

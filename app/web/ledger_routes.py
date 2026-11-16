@@ -166,7 +166,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)) -> Response:
         request=request,
         name="index.html",
         context={
-            "title": "Finanzas en Común",
+            "title": "Tandem",
             "csrf_token": csrf_token,
             "user": current_user,
             "active_nav": "home",

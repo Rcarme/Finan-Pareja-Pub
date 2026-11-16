@@ -16,8 +16,8 @@ When submitting pull requests, please respect the project's core invariants:
 ### 2. Local Development Workflow
 1. Fork the repo and clone locally:
    ```bash
-   git clone https://github.com/YOUR_USER/Finan-Pareja-Pub.git
-   cd Finan-Pareja-Pub
+   git clone https://github.com/YOUR_USER/tandem.git
+   cd tandem
    ```
 2. Create and activate a Python 3.11+ virtual environment:
    ```bash
@@ -62,8 +62,8 @@ Al proponer cambios o nuevas funcionalidades, respetá los pilares fundamentales
 ### 2. Flujo de Trabajo para el Desarrollo Local
 1. Hacé un Fork del repositorio y clonalo localmente:
    ```bash
-   git clone https://github.com/TU_USUARIO/Finan-Pareja-Pub.git
-   cd Finan-Pareja-Pub
+   git clone https://github.com/TU_USUARIO/tandem.git
+   cd tandem
    ```
 2. Creá un entorno virtual con Python 3.11+:
    ```bash

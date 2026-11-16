@@ -48,5 +48,5 @@ def offline_page(request: Request) -> Response:
     return templates.TemplateResponse(
         request=request,
         name="offline.html",
-        context={"title": "Sin conexión (RN-39) - Finanzas en Común"},
+        context={"title": "Sin conexión (RN-39) - Tandem"},
     )

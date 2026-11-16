@@ -37,8 +37,8 @@ It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), appe
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Rcarme/Finan-Pareja-Pub.git
-cd Finan-Pareja-Pub
+git clone https://github.com/Rcarme/tandem.git
+cd tandem
 
 # 2. Configure environment
 cp .env.example .env
@@ -98,8 +98,8 @@ Incluye una **UI dual** (Modo Simple Mobile-First y Modo Completo de escritorio)
 
 #### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/Rcarme/Finan-Pareja-Pub.git
-cd Finan-Pareja-Pub
+git clone https://github.com/Rcarme/tandem.git
+cd tandem
 ```
 
 #### 2. Configurar variables de entorno
