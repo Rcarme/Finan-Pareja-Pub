@@ -97,28 +97,71 @@ def test_csrf_endpoint_rejection_without_token():
     assert "csrf" in resp_login.json()["detail"].lower()
 
 
+KNOWN_POST_ENDPOINTS = [
+    "/setup",
+    "/login",
+    "/logout",
+    "/change-password",
+    "/cards/preview",
+    "/transactions",
+    "/reconciliation",
+    "/envelopes/new-goal",
+    "/obligations/fx-rate",
+    "/obligations/generate-schedule",
+    "/obligations/items",
+    "/close/execute",
+    "/rent/contract",
+    "/rent/collection",
+    "/rent/adjustment",
+    "/recurring/templates",
+    "/recurring/generate",
+    "/settings/accounts",
+    "/settings/categories",
+    "/settings/close-split",
+    "/settings/buffer-target",
+    "/settings/preferred-expense-account",
+    "/settings/gemini-api-key",
+    "/s/ai/parse",
+    "/s/ai/confirm",
+    "/s/new",
+    "/s/settings/mode",
+    "/s/settings/navigation",
+    "/settings/ownership",
+    "/settings/ownership/convert",
+    "/settings/ownership/adjust",
+]
+
+
 def test_all_post_endpoints_require_csrf_or_auth():
-    """Verifica programáticamente que ninguna ruta POST se ejecute sin CSRF o autenticación."""
+    """Verifica exhaustivamente que ninguna ruta POST se ejecute sin CSRF o autenticación."""
     from app.core.db import get_engine
     from app.models.base import Base
 
     Base.metadata.create_all(bind=get_engine())
     client = TestClient(app)
-    post_routes: list[str] = []
+    post_routes: set[str] = set(KNOWN_POST_ENDPOINTS)
 
     def _collect_routes(routes):
         for route in routes:
-            methods = getattr(route, "methods", None) or set()
+            raw_methods = getattr(route, "methods", None) or []
+            methods = {str(m).upper() for m in raw_methods}
             path = getattr(route, "path", "")
             if "POST" in methods and path:
-                post_routes.append(path)
-            elif hasattr(route, "routes"):
-                _collect_routes(route.routes)
+                post_routes.add(path)
+            sub_routes = getattr(route, "routes", None) or getattr(
+                getattr(route, "app", None), "routes", None
+            )
+            if sub_routes:
+                _collect_routes(sub_routes)
 
-    _collect_routes(app.routes)
+    if hasattr(app, "routes"):
+        _collect_routes(app.routes)
+    if hasattr(app, "router") and hasattr(app.router, "routes"):
+        _collect_routes(app.router.routes)
+
     assert len(post_routes) > 0, "Deben existir rutas POST registradas en la aplicación"
 
-    for path in post_routes:
+    for path in sorted(post_routes):
         # Enviar petición POST sin cookie ni token CSRF ni sesión
         # Ignorar rutas con parámetros variables de URL como {id}
         if "{" in path:
