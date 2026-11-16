@@ -18,8 +18,8 @@ class AIDraftItem:
 
     description: str
     amount: Decimal
-    category_name: str
-    account_name: str
+    category_name: str | None = None
+    account_name: str = ""
     activity: str = "household"
     notes: str | None = None
     charged_to_user_name: str | None = None
@@ -195,12 +195,10 @@ def sanitize_draft_item(
     )
     category_warning: str | None = None
     if not matched_cat:
-        matched_cat = default_category
-        if cat_candidate and cat_candidate.lower() != default_category.lower():
-            category_warning = (
-                f"La categoría '{cat_candidate}' sugerida por la IA no existe. "
-                f"Se preseleccionó '{default_category}'; por favor verificala antes de guardar."
-            )
+        category_warning = (
+            f"La categoría '{cat_candidate or '(sin categoría)'}' sugerida por la IA no existe. "
+            "Debés seleccionar una categoría válida antes de confirmar."
+        )
 
     acc_candidate = str(raw.get("account", "")).strip()
     matched_acc = next(

@@ -149,8 +149,8 @@ def ai_parse(
     items_with_dups = check_duplicates_for_draft_items(db, parsed_items, today_ar())
 
     for idx, (item, warning) in enumerate(items_with_dups):
-        matched_cat = cats_by_name.get(item.category_name.lower())
-        cat_id = matched_cat.id if matched_cat else (categories[0].id if categories else None)
+        matched_cat = cats_by_name.get(item.category_name.lower()) if item.category_name else None
+        cat_id = matched_cat.id if matched_cat else None
 
         matched_acc = accs_by_name.get(item.account_name.lower())
         acc_id = matched_acc.id if matched_acc else (accounts[0].id if accounts else None)

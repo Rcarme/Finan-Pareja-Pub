@@ -26,6 +26,12 @@ class Period(Base, TimestampMixin):
     """Período mensual (día 1 del mes). Estado open o closed (RN-11, RN-20)."""
 
     __tablename__ = "periods"
+    __table_args__ = (
+        CheckConstraint(
+            "period >= '2000-01-01' AND period <= '2100-12-31'",
+            name="chk_period_range",
+        ),
+    )
 
     period: Mapped[date] = mapped_column(Date, primary_key=True)  # YYYY-MM-01
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)

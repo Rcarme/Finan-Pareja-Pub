@@ -85,7 +85,7 @@
         <div class="ai-item-card {% if item.duplicate_warning %}is-duplicate-warning is-excluded{% endif %}" id="card_{{ item.index }}">
             <div class="ai-item-header">
                 <label class="ai-checkbox-label" for="include_{{ item.index }}">
-                    <input type="checkbox" id="include_{{ item.index }}" name="include_{{ item.index }}" value="1" {% if not item.duplicate_warning %}checked{% endif %} data-card-id="card_{{ item.index }}" data-amount-input="amount_{{ item.index }}">
+                    <input type="checkbox" id="include_{{ item.index }}" name="include_{{ item.index }}" value="1" {% if not item.duplicate_warning and item.category_id and item.account_id %}checked{% endif %} data-card-id="card_{{ item.index }}" data-amount-input="amount_{{ item.index }}">
                     <span>Ítem {{ item.index + 1 }}</span>
                 </label>
                 {% if item.notes %}
@@ -131,6 +131,9 @@
                 <div>
                     <label for="category_id_{{ item.index }}">Categoría</label>
                     <select id="category_id_{{ item.index }}" name="category_id_{{ item.index }}" required>
+                        {% if not item.category_id %}
+                        <option value="" disabled selected>⚠️ Seleccionar categoría (Requerido)...</option>
+                        {% endif %}
                         {% for cat in all_categories %}
                         <option value="{{ cat.id }}" {% if cat.id == item.category_id %}selected{% endif %}>{{ category_label(cat.name) }}</option>
                         {% endfor %}
@@ -140,6 +143,9 @@
                 <div>
                     <label for="account_id_{{ item.index }}">Cuenta / Tarjeta</label>
                     <select id="account_id_{{ item.index }}" name="account_id_{{ item.index }}" required>
+                        {% if not item.account_id %}
+                        <option value="" disabled selected>⚠️ Seleccionar cuenta (Requerido)...</option>
+                        {% endif %}
                         {% for acc in available_accounts %}
                         <option value="{{ acc.id }}" {% if acc.id == item.account_id %}selected{% endif %}>{{ acc.name }}</option>
                         {% endfor %}

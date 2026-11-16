@@ -1,5 +1,7 @@
 """Tests exhaustivos para la protección CSRF en formularios y peticiones HTTP."""
 
+import re
+
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
@@ -73,7 +75,7 @@ def test_csrf_endpoint_rejection_without_token():
             "user2_username": "sam",
             "user2_display_name": "Sam",
             "user2_password": "Password654321!",
-            "currency": "EUR",
+            "currency": "ARS",
             "split_pct": 50,
         },
         follow_redirects=False,
@@ -172,11 +174,10 @@ def test_all_post_endpoints_require_csrf_or_auth():
 
     for path in sorted(post_routes):
         # Enviar petición POST sin cookie ni token CSRF ni sesión
-        # Ignorar rutas con parámetros variables de URL como {id}
-        if "{" in path:
-            continue
-        resp = client.post(path, data={}, follow_redirects=False)
+        # Para rutas con parámetros variables como {id}, sustituir por un ID de prueba '1'
+        test_path = re.sub(r"\{[a-zA-Z0-9_]+\}", "1", path)
+        resp = client.post(test_path, data={}, follow_redirects=False)
         # Debe ser rechazada o redirigida a login/setup, nunca procesada con 200 OK
-        assert resp.status_code in (302, 303, 400, 401, 403, 422), (
+        assert resp.status_code in (302, 303, 400, 401, 403, 404, 422), (
             f"Ruta {path} vulnerable: permitió POST sin token ni sesión (HTTP {resp.status_code})"
         )

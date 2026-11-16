@@ -162,6 +162,10 @@ class Transaction(Base, TimestampMixin, OptimisticLockMixin):
             "(kind NOT IN ('income', 'expense')) OR (category_id IS NOT NULL)",
             name="chk_transaction_category_required",
         ),
+        CheckConstraint(
+            "date >= '2000-01-01' AND date <= '2100-12-31'",
+            name="chk_transaction_date_range",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigIntId, primary_key=True, autoincrement=True)

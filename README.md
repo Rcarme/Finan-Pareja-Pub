@@ -16,7 +16,7 @@
 
 **Tandem** is a shared domestic accounting and financial management web application built for couples and modern households.
 
-It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), append-only immutable auditing, native dual-currency management, **AI Assistant with Voice Dictation (Google Gemini + Web Speech API)**, and automated encrypted daily backups using `age` with Grandfather-Father-Son (GFS) retention.
+It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), append-only immutable auditing, native bimonetary management (ARS daily ledger + USD savings), **AI Assistant with Voice Dictation (Google Gemini + Web Speech API)**, and automated encrypted daily backups using `age` with Grandfather-Father-Son (GFS) retention.
 
 ---
 
@@ -28,7 +28,8 @@ It features a **Dual UI** (Mobile-First Simple View and Desktop Full Mode), appe
   - **Simple Mode (390px Mobile-First):** Lightning-fast daily expense logging, instant balance checks, and speech-to-text input.
   - **Full Mode:** Credit card reconciliation, balance carryovers, formal monthly closes, and analytics.
 - **AI Voice Assistant:** Natural language parsing of receipts, tickets, and informal messages via Google Gemini with automated duplicate detection.
-- **Zero-Setup Onboarding Wizard:** Self-contained `/setup` wizard on first run to configure partners, household currency, split ratios, and default accounts.
+- **Native Bimonetary Core:** Operates with Argentine Pesos (ARS) as primary domestic ledger and US Dollars (USD) for savings/investments (arbitrary multi-currency is scheduled in [ROADMAP.md](ROADMAP.md)).
+- **Zero-Setup Onboarding Wizard:** Self-contained `/setup` wizard on first run to configure partners, split ratios, and default accounts.
 - **Homelab Ready:** Production-grade `docker-compose.yml` with least-privilege PostgreSQL roles and automated encrypted off-site backups via `age` and `rclone`.
 
 ---
@@ -68,7 +69,7 @@ Incluye una **UI dual** (Modo Simple Mobile-First y Modo Completo de escritorio)
    - **Cero errores de redondeo:** Todo importe monetario se almacena y calcula estrictamente en `Decimal` con redondeo estándar bancario (`ROUND_HALF_UP`). Prohibido el uso de flotantes (`float`).
    - **Nada se borra contablemente:** Las anulaciones y correcciones se registran con motivo y usuario en una bitácora inmutable append-only (`audit_log`).
    - **Fondos y Titularidad:** Soporte para fondos comunes compartidos, dinero particular de cada integrante y tarjetas de crédito con titulares y extensiones.
-   - **Soporte Bimonetario Nativo:** Gestión en la moneda local de su país (ARS, EUR, USD, MXN, CLP, COP, etc.) y dólares estadounidenses (USD) para ahorros y compromisos a largo plazo.
+   - **Soporte Bimonetario Nativo:** Gestión en pesos argentinos (ARS) para los gastos diarios del hogar y dólares estadounidenses (USD) para ahorros y compromisos a largo plazo. (El soporte multimoneda configurable como EUR, MXN, etc. está planificado en [ROADMAP.md](ROADMAP.md)).
 
 2. **UI Dual (Diseñada para Teléfono y Escritorio):**
    - **Modo Simple (Mobile-First):** Optimizado para pantallas móviles (390 px). Carga ultrarrápida de gastos en la calle, consulta de saldos en segundos y filtros rápidos.
@@ -82,7 +83,7 @@ Incluye una **UI dual** (Modo Simple Mobile-First y Modo Completo de escritorio)
 
 4. **Asistente de Configuración Inicial (Onboarding Wizard):**
    - Si la base de datos está vacía, el sistema redirige automáticamente a `/setup`.
-   - Permite dar de alta a la **Persona 1** y **Persona 2**, elegir la moneda principal, definir la regla de reparto (50/50 o proporcional) y sembrar automáticamente las categorías y cuentas recomendadas.
+   - Permite dar de alta a la **Persona 1** y **Persona 2**, definir la regla de reparto (50/50 o proporcional) y sembrar automáticamente las categorías y cuentas recomendadas.
 
 5. **Infraestructura y Backups Cifrados:**
    - Despliegue con un solo comando: `docker compose up -d`.

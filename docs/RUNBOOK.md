@@ -80,3 +80,23 @@ Si necesitás restaurar la base de datos a partir de una copia de seguridad cifr
    ```bash
    docker compose restart app
    ```
+
+---
+
+## 4. Gestión de Migraciones DDL y Tabla `audit_log`
+
+Para garantizar inmutabilidad frente a compromisos de credenciales habituales, la tabla `audit_log` es propiedad exclusiva del rol de aprovisionamiento (`finanzas_bootstrap`). El rol regular de migraciones (`finanzas_owner`) solo tiene privilegios `SELECT, INSERT` sobre ella.
+
+Si en el futuro una actualización del sistema requiere alterar la estructura de `audit_log` (por ejemplo, agregar nuevas columnas de auditoría):
+
+1. **Ejecutar la migración con el rol de administración (`finanzas_bootstrap`):**
+   ```bash
+   docker compose run --rm \
+     -e MIGRATION_DATABASE_URL="postgresql://${POSTGRES_ADMIN_USER}:${POSTGRES_ADMIN_PASSWORD}@db:5432/${POSTGRES_DB}" \
+     migrate
+   ```
+2. **Reafirmar permisos y triggers de inmutabilidad:**
+   Tras la migración, re-ejecutá el script de roles para asegurar que los triggers y restricciones queden activos:
+   ```bash
+   docker compose exec -T db psql -U finanzas_bootstrap -d finanzas -f /opt/finanzas/db_roles.sql
+   ```

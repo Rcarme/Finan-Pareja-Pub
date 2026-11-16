@@ -100,16 +100,6 @@ class SettlementResult:
     total_personal_extra: Decimal = Decimal("0.00")
 
 
-@dataclass(frozen=True)
-class CloseSplitPart:
-    """Parte y retiro para un usuario al cierre de mes."""
-
-    user_id: int
-    part: Decimal
-    withdrawal: Decimal
-    carried_over: Decimal
-
-
 def calculate_income_ratios(incomes: list[UserIncome]) -> list[IncomeRatio]:
     """Calcula las proporciones exactas de cada integrante sobre el total de ingresos.
 
@@ -359,46 +349,3 @@ def calculate_monthly_settlement(
         total_buffer_target=total_buffer_amt,
         total_personal_extra=total_extra_amt,
     )
-
-
-def calculate_proportional_close_parts(
-    distributable_amount: Decimal,
-    income_ratios: list[IncomeRatio],
-    charges_by_user: dict[int, Decimal],
-) -> dict[int, CloseSplitPart]:
-    """Calcula parte y retiro de cada usuario en el cierre de mes proporcional (RN-22 evolutiva).
-
-    - Cada usuario recibe parte = floor_centavos(a_repartir * ratio).
-    - retiro = max(0, parte - Cargos(u)).
-    - Si retiro < 0, la diferencia pasa a arrastre personal.
-    """
-    result: dict[int, CloseSplitPart] = {}
-    if distributable_amount <= Decimal("0.00"):
-        for r in income_ratios:
-            c = charges_by_user.get(r.user_id, Decimal("0.00"))
-            result[r.user_id] = CloseSplitPart(
-                user_id=r.user_id,
-                part=Decimal("0.00"),
-                withdrawal=Decimal("0.00"),
-                carried_over=c,
-            )
-        return result
-
-    for r in income_ratios:
-        part = (distributable_amount * r.ratio).quantize(CENTAVO, rounding=ROUND_FLOOR)
-        charges = charges_by_user.get(r.user_id, Decimal("0.00"))
-        net = part - charges
-        if net >= Decimal("0.00"):
-            withdrawal = net
-            carried = Decimal("0.00")
-        else:
-            withdrawal = Decimal("0.00")
-            carried = -net
-
-        result[r.user_id] = CloseSplitPart(
-            user_id=r.user_id,
-            part=part,
-            withdrawal=withdrawal,
-            carried_over=carried,
-        )
-    return result

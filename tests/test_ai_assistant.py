@@ -94,7 +94,8 @@ def test_parse_llm_json_response():
         default_category="Servicios",
         default_account="Banco",
     )
-    # Categoría 'Supermercado' no existe en valid_categories -> debe alertar
+    # Categoría 'Supermercado' no existe en valid_categories -> no auto-asignar silenciosamente
+    assert draft.category_name is None
     assert draft.category_warning is not None
     assert "Supermercado" in draft.category_warning
     # Cuenta 'Efectivo' no existe en valid_accounts -> debe alertar
