@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.auth import SessionModel, User
 
 ph = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=1)
+DUMMY_ARGON2_HASH = ph.hash("tandem-dummy-auth-salt-constant-time-defense")
 SESSION_DURATION_DAYS = 30
 SESSION_DURATION_SECONDS = SESSION_DURATION_DAYS * 86400
 

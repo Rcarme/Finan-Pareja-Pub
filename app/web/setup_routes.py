@@ -1,6 +1,7 @@
 """Rutas del asistente de configuración inicial (/setup)."""
 
 import secrets
+from typing import Any
 
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -36,6 +37,31 @@ def _is_setup_token_valid(provided_token: str | None) -> bool:
     return secrets.compare_digest(provided_token.strip(), expected)
 
 
+def _render_setup_response(
+    request: Request,
+    context: dict[str, Any],
+    status_code: int = 200,
+) -> Response:
+    from app.web.app import templates
+
+    csrf_token = generate_csrf_token()
+    context["csrf_token"] = csrf_token
+    response = templates.TemplateResponse(
+        request=request,
+        name="setup.html",
+        context=context,
+        status_code=status_code,
+    )
+    response.set_cookie(
+        "csrf_token",
+        csrf_token,
+        httponly=False,
+        samesite="lax",
+        secure=secure_cookies(),
+    )
+    return response
+
+
 @setup_router.get("", response_class=HTMLResponse)
 async def setup_page(request: Request, db: Session = Depends(get_db)) -> Response:
     if is_onboarded(db):
@@ -50,14 +76,9 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
         else None
     )
 
-    from app.web.app import templates
-
-    csrf_token = generate_csrf_token()
-    response = templates.TemplateResponse(
+    return _render_setup_response(
         request=request,
-        name="setup.html",
         context={
-            "csrf_token": csrf_token,
             "error": prod_error,
             "require_setup_token": bool(settings.SETUP_TOKEN) or is_prod,
             "setup_token": "",
@@ -65,14 +86,6 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
         },
         status_code=403 if token_missing_in_prod else 200,
     )
-    response.set_cookie(
-        "csrf_token",
-        csrf_token,
-        httponly=False,
-        samesite="lax",
-        secure=secure_cookies(),
-    )
-    return response
 
 
 @setup_router.post("", response_class=HTMLResponse)
@@ -99,13 +112,9 @@ async def process_setup(
 
     client_ip = get_client_ip(request)
     if is_setup_rate_limited(client_ip):
-        from app.web.app import templates
-
-        return templates.TemplateResponse(
+        return _render_setup_response(
             request=request,
-            name="setup.html",
             context={
-                "csrf_token": generate_csrf_token(),
                 "error": "Demasiados intentos fallidos. Por favor, esperá 15 minutos.",
                 "require_setup_token": bool(settings.SETUP_TOKEN),
                 "setup_token": "",
@@ -114,13 +123,9 @@ async def process_setup(
         )
 
     if not validate_csrf(request, csrf_token):
-        from app.web.app import templates
-
-        return templates.TemplateResponse(
+        return _render_setup_response(
             request=request,
-            name="setup.html",
             context={
-                "csrf_token": generate_csrf_token(),
                 "error": "El token de seguridad expiró. Por favor, recargá e intentá nuevamente.",
                 "require_setup_token": bool(settings.SETUP_TOKEN),
                 "setup_token": setup_token if _is_setup_token_valid(setup_token) else "",
@@ -130,13 +135,9 @@ async def process_setup(
 
     is_prod = (settings.ENVIRONMENT or "").lower() in ("production", "prod")
     if is_prod and not (settings.SETUP_TOKEN or "").strip():
-        from app.web.app import templates
-
-        return templates.TemplateResponse(
+        return _render_setup_response(
             request=request,
-            name="setup.html",
             context={
-                "csrf_token": generate_csrf_token(),
                 "error": "Por seguridad, en producción debe configurarse SETUP_TOKEN en .env.",
                 "require_setup_token": True,
                 "setup_token": "",
@@ -147,13 +148,9 @@ async def process_setup(
 
     if (settings.SETUP_TOKEN or is_prod) and not _is_setup_token_valid(setup_token):
         record_failed_setup_attempt(client_ip)
-        from app.web.app import templates
-
-        return templates.TemplateResponse(
+        return _render_setup_response(
             request=request,
-            name="setup.html",
             context={
-                "csrf_token": generate_csrf_token(),
                 "error": "Token de instalación previo inválido. Verificá SETUP_TOKEN en tu .env.",
                 "require_setup_token": True,
                 "setup_token": "",
@@ -197,14 +194,9 @@ async def process_setup(
         return response
 
     except ValueError as exc:
-        from app.web.app import templates
-
-        new_csrf = generate_csrf_token()
-        resp = templates.TemplateResponse(
+        return _render_setup_response(
             request=request,
-            name="setup.html",
             context={
-                "csrf_token": new_csrf,
                 "error": str(exc),
                 "form": {
                     "user1_username": user1_username,
@@ -221,7 +213,3 @@ async def process_setup(
             },
             status_code=400,
         )
-        resp.set_cookie(
-            "csrf_token", new_csrf, httponly=False, samesite="lax", secure=secure_cookies()
-        )
-        return resp

@@ -138,3 +138,11 @@ def check_db_connection() -> bool:
         return True
     except Exception:
         return False
+
+
+def acquire_advisory_lock(db: Session, key: int, *, shared: bool = False) -> None:
+    """Adquiere un advisory lock a nivel transacción en PostgreSQL; no-op seguro en SQLite."""
+    bind = db.get_bind() if hasattr(db, "get_bind") else db.bind
+    if bind is not None and bind.dialect.name == "postgresql":
+        fn = "pg_advisory_xact_lock_shared" if shared else "pg_advisory_xact_lock"
+        db.execute(text(f"SELECT {fn}(:key)"), {"key": key})

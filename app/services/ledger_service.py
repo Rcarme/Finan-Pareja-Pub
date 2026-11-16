@@ -7,12 +7,13 @@ from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.db import acquire_advisory_lock
 from app.core.formatters import today_ar
 from app.core.transactions import ConcurrencyError as ConcurrencyError
 from app.core.transactions import atomic_service, commit_service
@@ -124,7 +125,7 @@ def check_period_open(db: Session, period_date: date) -> None:
         )
     p = date(period_date.year, period_date.month, 1)
     # El cierre usa el bloqueo exclusivo antes de calcular su snapshot.
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     closed_cutoff = db.scalar(select(func.max(Period.period)).where(Period.status == "closed"))
     if closed_cutoff is not None and p <= closed_cutoff:
         raise ClosedPeriodError(
@@ -238,7 +239,7 @@ def create_transaction(
     if kind in ("income", "expense") and category_id is None:
         raise ValueError("La categoría es obligatoria para ingresos y gastos (RN-05).")
 
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     opening = db.get(Setting, "ownership_opening")
     photo_date = get_opening_date(db)
     validate_opening_omission(kind, tx_date, photo_date, opening_omission)
@@ -388,7 +389,7 @@ def void_transaction(
     if len(reason.strip()) > 255:
         raise ValueError("El motivo de anulación no puede superar los 255 caracteres.")
 
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     db.info.pop("_cached_ownership_summary", None)
     tx = db.get(Transaction, transaction_id)
     if tx is None:
@@ -511,7 +512,7 @@ def update_transaction(
     activity: str | None = None,
 ) -> Transaction:
     """Modifica una transacción existente con control de concurrencia optimista (RN-10)."""
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     db.info.pop("_cached_ownership_summary", None)
     tx = db.get(Transaction, transaction_id)
     if tx is None:
@@ -867,7 +868,7 @@ def reconcile_account(
 ) -> Transaction | None:
     """Concilia una cuenta comparando saldo real vs esperado y generando ajuste (RN-19)."""
     # El cálculo y su ajuste excluyen todos los escritores contables coordinados.
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     account = db.scalar(
         select(Account)
         .where(Account.id == account_id)
@@ -979,7 +980,7 @@ def create_account(
         owner = db.get(User, owner_user_id)
         if owner is None or not owner.active:
             raise ValueError("El titular debe existir y estar activo.")
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     if ownership_enabled(db) and opening_balance != Decimal("0"):
         raise ValueError(
             "Después de la apertura, una cuenta nueva comienza en cero; registrá su origen."
@@ -1053,7 +1054,7 @@ def rename_account(
     if len(clean_name) > 100:
         raise ValueError("El nombre de la cuenta no puede superar los 100 caracteres.")
 
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     acc = db.execute(
         select(Account)
         .where(Account.id == account_id)
@@ -1106,7 +1107,7 @@ def create_category(
     activity: str = "household",
 ) -> Category:
     """Crea una categoría contable de ingresos o gastos auditada (RN-37, RN-41, SPEC §4)."""
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     if not name or not name.strip():
         raise ValueError("El nombre de la categoría es obligatorio.")
     clean_name = name.strip()
@@ -1232,7 +1233,7 @@ def delete_category(
     user_id: int,
 ) -> Category:
     """Desactiva una categoría contable preservando historial y auditando (RN-05, RN-37)."""
-    db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
+    acquire_advisory_lock(db, 170170, shared=True)
     cat = db.execute(
         select(Category)
         .where(Category.id == category_id)
@@ -1282,7 +1283,7 @@ def configure_account(
     validate_currency(currency)
     if account_type not in {"bank", "wallet", "cash", "credit"}:
         raise ValueError("Tipo de cuenta inválido.")
-    db.execute(text("SELECT pg_advisory_xact_lock(170170)"))
+    acquire_advisory_lock(db, 170170, shared=False)
     account = db.scalar(
         select(Account)
         .where(Account.id == account_id)

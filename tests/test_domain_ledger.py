@@ -10,13 +10,18 @@ from app.domain.ownership import common_fund, validate_currency, validate_money
 def test_validate_currency():
     assert validate_currency("ars") == "ARS"
     assert validate_currency("USD") == "USD"
-    assert validate_currency("eur") == "EUR"
-    assert validate_currency("mxn") == "MXN"
+    assert validate_currency(" ars ") == "ARS"
 
-    with pytest.raises(ValueError, match="código alfabético de 3 letras"):
+    with pytest.raises(ValueError, match="Moneda no soportada"):
+        validate_currency("eur")
+
+    with pytest.raises(ValueError, match="Moneda no soportada"):
+        validate_currency("mxn")
+
+    with pytest.raises(ValueError, match="Moneda no soportada"):
         validate_currency("US")
 
-    with pytest.raises(ValueError, match="código alfabético de 3 letras"):
+    with pytest.raises(ValueError, match="Moneda no soportada"):
         validate_currency("PESOS")
 
 

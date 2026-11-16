@@ -11,7 +11,9 @@ from app.models.base import Base, BigIntId, TimestampMixin
 
 class OwnershipEntry(Base, TimestampMixin):
     __tablename__ = "ownership_entries"
-    __table_args__ = (CheckConstraint("length(currency) = 3", name="chk_ownership_currency"),)
+    __table_args__ = (
+        CheckConstraint("currency IN ('ARS', 'USD')", name="chk_ownership_currency_valid"),
+    )
     id: Mapped[int] = mapped_column(BigIntId, primary_key=True, autoincrement=True)
     user_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True

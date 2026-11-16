@@ -177,3 +177,56 @@ def test_setup_rate_limiting():
     assert is_setup_rate_limited(test_ip)
     clear_failed_setup_attempts(test_ip)
     assert not is_setup_rate_limited(test_ip)
+
+
+def test_setup_csrf_cookie_set_on_errors():
+    """Verifica que /setup siempre establezca la cookie csrf_token coincidente
+    en respuestas de error.
+    """
+    from starlette.testclient import TestClient
+
+    from app.core.config import settings
+    from app.core.db import get_engine
+    from app.core.middleware import invalidate_onboarding_cache
+    from app.models.base import Base
+    from app.web.app import app
+
+    engine = get_engine()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    invalidate_onboarding_cache()
+
+    client = TestClient(app)
+
+    # 1. GET /setup debe retornar 200 y establecer cookie csrf_token
+    resp_get = client.get("/setup")
+    assert resp_get.status_code == 200
+    assert "csrf_token" in resp_get.cookies
+    initial_csrf = resp_get.cookies["csrf_token"]
+    assert len(initial_csrf) > 10
+
+    # 2. POST /setup con token de instalación incorrecto (403) debe renovar y setear cookie
+    original_token = settings.SETUP_TOKEN
+    settings.SETUP_TOKEN = "real-setup-token"
+    try:
+        resp_fail = client.post(
+            "/setup",
+            data={
+                "csrf_token": initial_csrf,
+                "setup_token": "wrong-token",
+                "user1_username": "alex",
+                "user1_password": "Password123456!",
+                "user2_username": "sam",
+                "user2_password": "Password654321!",
+            },
+            cookies={"csrf_token": initial_csrf},
+            follow_redirects=False,
+        )
+        assert resp_fail.status_code == 403
+        assert "csrf_token" in resp_fail.cookies
+        # La cookie devuelta debe coincidir con el token del formulario renderizado
+        new_cookie_token = resp_fail.cookies["csrf_token"]
+        assert f'value="{new_cookie_token}"' in resp_fail.text
+    finally:
+        settings.SETUP_TOKEN = original_token
+        invalidate_onboarding_cache()

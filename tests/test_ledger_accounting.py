@@ -161,3 +161,55 @@ def test_transaction_date_range_validation(accounting_db):
             description="Fecha muy en el futuro",
             user_id=1,
         )
+
+
+def test_account_currency_whitelist(accounting_db):
+    """Verifica que la creación de cuentas restrinja estrictamente a ARS y USD."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.services.ledger_service import create_account
+
+    # 1. Moneda no soportada a nivel de servicio
+    with pytest.raises(ValueError, match="Moneda no soportada"):
+        create_account(
+            db=accounting_db,
+            name="Cuenta en Euros",
+            account_type="bank",
+            opening_balance=Decimal("0.00"),
+            user_id=1,
+            currency="EUR",
+        )
+
+    # 2. Moneda válida ARS y USD a nivel de servicio
+    acc_ars = create_account(
+        db=accounting_db,
+        name="Cuenta ARS",
+        account_type="bank",
+        opening_balance=Decimal("0.00"),
+        user_id=1,
+        currency="ARS",
+    )
+    assert acc_ars.currency == "ARS"
+
+    acc_usd = create_account(
+        db=accounting_db,
+        name="Cuenta USD",
+        account_type="bank",
+        opening_balance=Decimal("0.00"),
+        user_id=1,
+        currency="USD",
+    )
+    assert acc_usd.currency == "USD"
+
+    # 3. Violación directa del CheckConstraint a nivel de base de datos
+    invalid_acc = Account(
+        name="Cuenta Ilegal",
+        type="bank",
+        currency="ZZZ",
+        opening_balance=Decimal("0.00"),
+        opening_period=date(2026, 1, 1),
+    )
+    accounting_db.add(invalid_acc)
+    with pytest.raises(IntegrityError):
+        accounting_db.commit()
+    accounting_db.rollback()

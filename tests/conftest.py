@@ -10,5 +10,5 @@ if str(ROOT_DIR) not in sys.path:
 # Forzar entorno de test y clave antes de cargar la app o settings
 os.environ["ENVIRONMENT"] = "test"
 os.environ["APP_SECRET_KEY"] = "test-secret-key-with-at-least-32-chars-long!"
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-os.environ["TEST_DATABASE_URL"] = "sqlite:///:memory:"
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("TEST_DATABASE_URL", "sqlite:///:memory:")

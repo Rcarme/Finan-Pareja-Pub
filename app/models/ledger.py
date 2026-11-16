@@ -55,7 +55,9 @@ class Account(Base, TimestampMixin, OptimisticLockMixin):
         Boolean, default=False, server_default="false", nullable=False
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    __table_args__ = (CheckConstraint("length(currency) = 3", name="chk_account_currency"),)
+    __table_args__ = (
+        CheckConstraint("currency IN ('ARS', 'USD')", name="chk_account_currency_valid"),
+    )
 
 
 class Category(Base, TimestampMixin, OptimisticLockMixin):

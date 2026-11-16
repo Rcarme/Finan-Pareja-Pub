@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import Response
 
 from app.core.auth import (
+    DUMMY_ARGON2_HASH,
     SESSION_DURATION_SECONDS,
     verify_password,
 )
@@ -83,12 +84,11 @@ def login_action(
     stmt = select(User).where(func.lower(User.username) == clean_username, User.active == True)  # noqa: E712
     user = db.execute(stmt).scalar_one_or_none()
 
-    # Si el usuario no existe, se calcula una verificación dummy contra timing
-    dummy_hash = "$argon2id$v=19$m=65536,t=2,p=1$c29tZXNhbHQ$P6+2Sg71wV/l/kR+v1L1cQ"
+    # Si el usuario no existe, se calcula una verificación dummy contra timing (Argon2id real)
     valid_password = (
         verify_password(password, user.password_hash)
         if user
-        else (verify_password(password, dummy_hash) and False)
+        else (verify_password(password, DUMMY_ARGON2_HASH) and False)
     )
 
     if not user or not valid_password:

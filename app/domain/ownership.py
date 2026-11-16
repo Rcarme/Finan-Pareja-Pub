@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 
 def validate_activity(value: str) -> str:
@@ -12,9 +12,10 @@ def validate_activity(value: str) -> str:
 
 
 def validate_currency(value: str) -> str:
-    if len(value) != 3 or not value.isalpha():
-        raise ValueError("La moneda debe ser un código alfabético de 3 letras (ej. ARS, USD, EUR).")
-    return value.upper()
+    code = value.strip().upper()
+    if code not in {"ARS", "USD"}:
+        raise ValueError("Moneda no soportada. Tandem opera exclusivamente en ARS y USD.")
+    return code
 
 
 def common_fund(
@@ -33,7 +34,7 @@ def validate_money(value: Decimal, *, nonnegative: bool = False) -> None:
     if (
         not value.is_finite()
         or abs(value) > Decimal("999999999999.99")
-        or value != value.quantize(Decimal("0.01"))
+        or value != value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         or (nonnegative and value < 0)
     ):
         raise ValueError(
