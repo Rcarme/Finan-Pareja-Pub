@@ -22,9 +22,9 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
 
     csrf_token = generate_csrf_token()
     response = templates.TemplateResponse(
-        "setup.html",
-        {
-            "request": request,
+        request=request,
+        name="setup.html",
+        context={
             "csrf_token": csrf_token,
             "error": None,
         },
@@ -64,9 +64,9 @@ async def process_setup(
         from app.web.app import templates
 
         return templates.TemplateResponse(
-            "setup.html",
-            {
-                "request": request,
+            request=request,
+            name="setup.html",
+            context={
                 "csrf_token": generate_csrf_token(),
                 "error": "El token de seguridad expiró. Por favor, recargá e intentá nuevamente.",
             },
@@ -112,9 +112,9 @@ async def process_setup(
 
         new_csrf = generate_csrf_token()
         resp = templates.TemplateResponse(
-            "setup.html",
-            {
-                "request": request,
+            request=request,
+            name="setup.html",
+            context={
                 "csrf_token": new_csrf,
                 "error": str(exc),
                 "form": {
