@@ -48,7 +48,14 @@ def get_effective_gemini_api_key(db: Session) -> str | None:
     if setting and isinstance(setting.value, dict) and setting.value.get("api_key"):
         val = str(setting.value["api_key"]).strip()
         if val:
-            return decrypt_secret(val)
+            try:
+                decrypted = decrypt_secret(val)
+                if decrypted:
+                    return decrypted
+            except Exception:
+                logger.warning(
+                    "Fallo al descifrar gemini_api_key. Posible rotación de APP_SECRET_KEY."
+                )
     env_val = (settings.GEMINI_API_KEY or "").strip()
     return env_val or None
 

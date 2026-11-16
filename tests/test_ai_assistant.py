@@ -84,3 +84,31 @@ def test_parse_llm_json_response():
     assert len(parsed) == 1
     assert parsed[0]["description"] == "Leche y pan"
     assert parsed[0]["amount"] == 1500.50
+
+
+def test_get_effective_gemini_api_key_with_rotated_key():
+    from app.core.db import get_engine, get_session_factory
+    from app.core.security import encrypt_secret
+    from app.models.base import Base
+    from app.models.close import Setting
+    from app.services.ai_assistant_service import get_effective_gemini_api_key
+
+    Base.metadata.create_all(bind=get_engine())
+    session = get_session_factory()()
+    try:
+        old_encrypted = encrypt_secret(
+            "my-gemini-key-val", key_material="old-master-secret-123456789012"
+        )
+        setting = session.query(Setting).filter(Setting.key == "gemini_api_key").first()
+        if not setting:
+            setting = Setting(key="gemini_api_key", value={"api_key": old_encrypted})
+            session.add(setting)
+        else:
+            setting.value = {"api_key": old_encrypted}
+        session.commit()
+
+        # No debe lanzar InvalidToken ni excepción; debe degradar graciosamente a None o env var
+        effective = get_effective_gemini_api_key(session)
+        assert effective is None or isinstance(effective, str)
+    finally:
+        session.close()

@@ -50,6 +50,10 @@ def test_secret_encryption_and_decryption():
     assert encrypt_secret("") == ""
     assert decrypt_secret("plain-text") == "plain-text"
 
+    # Rotación de clave: token cifrado con clave anterior no debe provocar error 500 / InvalidToken
+    rotated_key_material = "new-different-master-key-after-rotation"
+    assert decrypt_secret(encrypted, rotated_key_material) == ""
+
 
 def test_rate_limiting():
     ip = "192.168.1.100"
