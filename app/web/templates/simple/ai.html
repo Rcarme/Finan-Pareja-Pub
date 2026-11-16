@@ -104,6 +104,17 @@
             </div>
             {% endif %}
 
+            {% if item.category_warning or item.account_warning %}
+            <div class="ai-duplicate-alert" style="border-left: 4px solid var(--warning, #f59e0b); background: rgba(245, 158, 11, 0.1);" role="alert">
+                <span class="alert-icon" aria-hidden="true">⚠️</span>
+                <div>
+                    <strong>Revisión requerida en clasificación</strong>
+                    {% if item.category_warning %}<p>{{ item.category_warning }}</p>{% endif %}
+                    {% if item.account_warning %}<p>{{ item.account_warning }}</p>{% endif %}
+                </div>
+            </div>
+            {% endif %}
+
             <div class="ai-item-grid">
                 <div>
                     <label for="description_{{ item.index }}">Concepto</label>

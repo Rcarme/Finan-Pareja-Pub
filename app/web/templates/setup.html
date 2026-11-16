@@ -16,6 +16,17 @@
     </div>
     {% endif %}
 
+    {% if blocked_in_prod %}
+    <div class="card" style="padding: 1.5rem; text-align: center; border: 1px solid var(--danger, #ef4444);">
+        <p style="color: #cbd5e1; margin-bottom: 1rem;">
+            Por seguridad, para prevenir tomas de control en entornos de producción, el asistente está bloqueado hasta que configures una clave secreta en tu archivo <code>.env</code>:
+        </p>
+        <pre style="background: #0f172a; padding: 0.75rem; border-radius: 0.375rem; color: #38bdf8; display: inline-block; font-size: 0.9rem;">SETUP_TOKEN=tu-clave-secreta-aleatoria</pre>
+        <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 1rem;">
+            Una vez agregada la variable, reiniciá el servicio para continuar con la inicialización.
+        </p>
+    </div>
+    {% else %}
     <form method="POST" action="/setup" style="display: flex; flex-direction: column; gap: 1.5rem;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
@@ -91,15 +102,9 @@
                         Moneda principal del hogar
                     </label>
                     <select id="currency" name="currency" style="width: 100%; min-height: 42px; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid var(--border); background: var(--bg-color); color: #fff;">
-                        <option value="ARS" {% if not form or form.currency == 'ARS' %}selected{% endif %}>ARS ($ Peso Argentino)</option>
-                        <option value="EUR" {% if form and form.currency == 'EUR' %}selected{% endif %}>EUR (€ Euro)</option>
-                        <option value="USD" {% if form and form.currency == 'USD' %}selected{% endif %}>USD ($ Dólar Estadounidense)</option>
-                        <option value="MXN" {% if form and form.currency == 'MXN' %}selected{% endif %}>MXN ($ Peso Mexicano)</option>
-                        <option value="CLP" {% if form and form.currency == 'CLP' %}selected{% endif %}>CLP ($ Peso Chileno)</option>
-                        <option value="COP" {% if form and form.currency == 'COP' %}selected{% endif %}>COP ($ Peso Colombiano)</option>
-                        <option value="UYU" {% if form and form.currency == 'UYU' %}selected{% endif %}>UYU ($ Peso Uruguayo)</option>
+                        <option value="ARS" selected>ARS ($ Peso Argentino) — Base bimonetaria</option>
                     </select>
-                    <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 0.25rem;">El sistema soporta además USD en forma nativa para ahorros y compromisos.</small>
+                    <small style="color: #64748b; font-size: 0.75rem; display: block; margin-top: 0.25rem;">El sistema opera en modo bimonetario nativo con ARS para el gasto diario y USD para ahorros y compromisos.</small>
                 </div>
 
                 <div>
@@ -183,6 +188,7 @@
             Comenzar a usar Tandem 🚀
         </button>
     </form>
+    {% endif %}
 </div>
 
 <script nonce="{{ csp_nonce(request) }}">

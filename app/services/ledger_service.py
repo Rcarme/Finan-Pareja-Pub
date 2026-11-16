@@ -118,6 +118,10 @@ def resolve_transaction_period(
 
 def check_period_open(db: Session, period_date: date) -> None:
     """Verifica que el período contable esté abierto y lo bloquea con FOR SHARE (RN-11, M-02)."""
+    if not (2000 <= period_date.year <= 2100):
+        raise ValueError(
+            f"El período contable ({period_date:%Y-%m}) está fuera del rango permitido (2000-2100)."
+        )
     p = date(period_date.year, period_date.month, 1)
     # El cierre usa el bloqueo exclusivo antes de calcular su snapshot.
     db.execute(text("SELECT pg_advisory_xact_lock_shared(170170)"))
@@ -204,6 +208,17 @@ def create_transaction(
         ).scalar_one_or_none()
         if existing is not None:
             return existing
+
+    if not (2000 <= tx_date.year <= 2100):
+        raise ValueError(
+            f"La fecha de la transacción ({tx_date.isoformat()}) "
+            "está fuera del rango contable permitido (2000-2100)."
+        )
+    if period is not None and not (2000 <= period.year <= 2100):
+        raise ValueError(
+            f"El período asignado ({period.isoformat()}) "
+            "está fuera del rango contable permitido (2000-2100)."
+        )
 
     if not description or not description.strip():
         raise ValueError("La descripción es obligatoria.")
@@ -589,6 +604,17 @@ def update_transaction(
     elif envelope_id is not None:
         raise ValueError(
             "No se puede asignar un sobre a un movimiento existente; debe anular y recargar."
+        )
+
+    if not (2000 <= tx_date.year <= 2100):
+        raise ValueError(
+            f"La fecha de la transacción ({tx_date.isoformat()}) "
+            "está fuera del rango contable permitido (2000-2100)."
+        )
+    if period is not None and not (2000 <= period.year <= 2100):
+        raise ValueError(
+            f"El período asignado ({period.isoformat()}) "
+            "está fuera del rango contable permitido (2000-2100)."
         )
 
     if not description or not description.strip():

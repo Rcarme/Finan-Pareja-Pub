@@ -25,6 +25,8 @@ class AIDraftItem:
     charged_to_user_name: str | None = None
     tx_date: str | None = None
     duplicate_warning: str | None = None
+    category_warning: str | None = None
+    account_warning: str | None = None
 
     def __post_init__(self) -> None:
         if not self.description.strip():
@@ -189,14 +191,30 @@ def sanitize_draft_item(
     cat_candidate = str(raw.get("category", "")).strip()
     matched_cat = next(
         (c for c in valid_categories if c.lower() == cat_candidate.lower()),
-        default_category,
+        None,
     )
+    category_warning: str | None = None
+    if not matched_cat:
+        matched_cat = default_category
+        if cat_candidate and cat_candidate.lower() != default_category.lower():
+            category_warning = (
+                f"La categoría '{cat_candidate}' sugerida por la IA no existe. "
+                f"Se preseleccionó '{default_category}'; por favor verificala antes de guardar."
+            )
 
     acc_candidate = str(raw.get("account", "")).strip()
     matched_acc = next(
         (a for a in valid_accounts if a.lower() == acc_candidate.lower()),
-        default_account,
+        None,
     )
+    account_warning: str | None = None
+    if not matched_acc:
+        matched_acc = default_account
+        if acc_candidate and acc_candidate.lower() != default_account.lower():
+            account_warning = (
+                f"La cuenta '{acc_candidate}' sugerida por la IA no existe. "
+                f"Se preseleccionó '{default_account}'; por favor verificala antes de guardar."
+            )
 
     activity = str(raw.get("activity", "household")).strip().lower()
     if activity not in ("household", "personal"):
@@ -237,6 +255,8 @@ def sanitize_draft_item(
         notes=notes,
         charged_to_user_name=user_name,
         tx_date=tx_date,
+        category_warning=category_warning,
+        account_warning=account_warning,
     )
 
 

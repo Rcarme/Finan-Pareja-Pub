@@ -23,11 +23,17 @@ esac
 
 for role_password in "$POSTGRES_PASSWORD" "$POSTGRES_OWNER_PASSWORD" "$POSTGRES_APP_PASSWORD"; do
     case "$role_password" in
-        *CAMBIAR_PASSWORD*|*changeme*|*change-me*|*CHANGE_ME*|*replace-with*)
-            reject "Las contraseñas de bootstrap deben ser propias, no placeholders."
+        *CAMBIAR_PASSWORD*|*changeme*|*change-me*|*CHANGE_ME*|*replace-with*|*definir-password*|*definir-*|*password-admin*|*password-owner*|*password-app*|*admin123*|*secret*|*123456*)
+            reject "Las contraseñas de bootstrap deben ser propias, no placeholders ni valores por defecto."
             ;;
     esac
 done
+
+if [ "$POSTGRES_PASSWORD" = "$POSTGRES_OWNER_PASSWORD" ] || \
+   [ "$POSTGRES_PASSWORD" = "$POSTGRES_APP_PASSWORD" ] || \
+   [ "$POSTGRES_OWNER_PASSWORD" = "$POSTGRES_APP_PASSWORD" ]; then
+    reject "Las contraseñas de los 3 roles (admin, owner y app) deben ser distintas entre sí para garantizar el principio de menor privilegio."
+fi
 
 # getenv evita claves en argumentos/procesos y el quoting de psql evita interpolar SQL.
 psql --set=ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" <<'SQL'

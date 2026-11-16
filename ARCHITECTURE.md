@@ -63,19 +63,25 @@ Se utiliza **Argon2id** (`PasswordHasher(time_cost=2, memory_cost=65536, paralle
 - **Rate Limiting:** Control de intentos fallidos en login por IP y usuario (máximo 5 intentos en 15 minutos).
 - **Body Limit:** `RequestBodyLimitMiddleware` limita peticiones a 2.1 MB para prevenir ataques DoS por agotamiento de memoria.
 
+### 4.4. Inmutabilidad de Auditoría y Separación de Roles en PostgreSQL
+- **Rol de Aplicación (`finanzas_app`):** Solo tiene permisos `SELECT, INSERT` sobre `audit_log`. Se le revocan explícitamente `UPDATE`, `DELETE`, `TRUNCATE` y `TRIGGER`.
+- **Rol de Migraciones (`finanzas_owner`):** Solo tiene permisos `SELECT, INSERT` sobre `audit_log`. Tampoco posee privilegios de mutación ni de trigger.
+- **Ownership de `audit_log`:** La tabla pertenece al superusuario de aprovisionamiento inicial (`finanzas_bootstrap`). Ni la aplicación web en runtime ni el ejecutor de migraciones DDL pueden alterar su estructura ni desactivar los triggers de inmutabilidad (`trg_audit_log_protect_row` y `trg_audit_log_protect_truncate`).
+
 ---
 
 ## 5. Asistente de Configuración Inicial (Onboarding)
 
 1. En el arranque inicial, `AuthenticationMiddleware` consulta si existen usuarios (`select count(id) from users`).
 2. Si el conteo es cero, cualquier petición HTTP no estática se redirige a `/setup`.
-3. El wizard de setup realiza una transacción atómica protegida:
+3. **Protección contra tomas de control previa:** En entornos de producción (`ENVIRONMENT=production`), el asistente `/setup` exige obligatoriamente la configuración y validación de `SETUP_TOKEN` en `.env`. Si no está configurado, `/setup` responde HTTP 403 Forbidden impidiendo que un tercero inicialice una instancia expuesta antes de tiempo.
+4. El wizard de setup realiza una transacción atómica protegida:
    - Crea Persona 1 y Persona 2 con contraseñas Argon2id.
-   - Configura la moneda principal del hogar y la regla de reparto.
-   - Opcionalmente guarda la API Key de Google Gemini (cifrada).
+   - Configura la moneda principal del hogar (base ARS) y la regla de reparto.
+   - Opcionalmente guarda la API Key de Google Gemini (cifrada con Fernet + HKDF).
    - Opcionalmente activa el módulo de Negocio/Freelance con nombre configurable.
    - Siembra las categorías universales y cuentas base.
-4. Tras el alta, `/setup` queda deshabilitado para evitar reinicializaciones no autorizadas.
+5. Tras el alta, `/setup` queda deshabilitado para evitar reinicializaciones no autorizadas.
 
 ---
 

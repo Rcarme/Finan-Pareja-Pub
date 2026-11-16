@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.formatters import today_ar
 from app.models.auth import User
-from app.models.ledger import Account
+from app.models.ledger import Account, Category
 from app.services.ai_assistant_service import (
     check_duplicates_for_draft_items,
     confirm_ai_draft_transactions,
@@ -175,6 +175,8 @@ def ai_parse(
                 "tx_date": item.tx_date or today_ar().isoformat(),
                 "notes": item.notes or "",
                 "duplicate_warning": warning,
+                "category_warning": item.category_warning,
+                "account_warning": item.account_warning,
             }
         )
 
@@ -246,6 +248,23 @@ async def ai_confirm(
 
     if not confirmed_items:
         raise HTTPException(400, "No seleccionaste ningún movimiento para ingresar.")
+
+    valid_cat_ids: set[int] = set(
+        db.scalars(select(Category.id).where(Category.active.is_(True))).all()
+    )
+    valid_acc_ids: set[int] = set(
+        db.scalars(select(Account.id).where(Account.active.is_(True))).all()
+    )
+
+    for it in confirmed_items:
+        if it.get("category_id") not in valid_cat_ids:
+            raise HTTPException(
+                400, "Una o más categorías seleccionadas son inválidas o inexistentes."
+            )
+        if it.get("account_id") not in valid_acc_ids:
+            raise HTTPException(
+                400, "Una o más cuentas seleccionadas son inválidas o inexistentes."
+            )
 
     idem_token = form.get("idempotency_token")
     operation = None

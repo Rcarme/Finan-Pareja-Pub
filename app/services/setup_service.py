@@ -96,11 +96,13 @@ def initialize_instance(
     if not valid_pass2:
         raise ValueError(f"Contraseña de {user2_display_name or u2_user}: {msg2}")
 
-    # Normalizar y validar moneda ISO 3 letras
+    # Normalizar y validar moneda base soportada
     clean_currency = currency.strip().upper()
-    if len(clean_currency) != 3 or not clean_currency.isalpha():
+    if clean_currency != "ARS":
         raise ValueError(
-            "La moneda debe ser un código alfabético de 3 letras (ej. ARS, USD, EUR, MXN)."
+            "Actualmente la moneda base del libro mayor doméstico es estrictamente ARS "
+            "(con soporte bimonetario nativo para cuentas y sobres de ahorro en USD). "
+            "La arquitectura multidivisa configurable está planificada en ROADMAP.md."
         )
 
     # 1. Crear los 2 usuarios

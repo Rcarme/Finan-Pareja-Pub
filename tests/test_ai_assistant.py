@@ -85,6 +85,22 @@ def test_parse_llm_json_response():
     assert parsed[0]["description"] == "Leche y pan"
     assert parsed[0]["amount"] == 1500.50
 
+    from app.domain.ai_assistant import sanitize_draft_item
+
+    draft = sanitize_draft_item(
+        parsed[0],
+        valid_categories=["Servicios", "Farmacia"],
+        valid_accounts=["Banco", "Mercado Pago"],
+        default_category="Servicios",
+        default_account="Banco",
+    )
+    # Categoría 'Supermercado' no existe en valid_categories -> debe alertar
+    assert draft.category_warning is not None
+    assert "Supermercado" in draft.category_warning
+    # Cuenta 'Efectivo' no existe en valid_accounts -> debe alertar
+    assert draft.account_warning is not None
+    assert "Efectivo" in draft.account_warning
+
 
 def test_get_effective_gemini_api_key_with_rotated_key():
     from app.core.db import get_engine, get_session_factory

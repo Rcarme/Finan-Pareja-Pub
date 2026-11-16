@@ -35,7 +35,7 @@ def test_onboarding_lifecycle(db_session):
         user2_username="sam",
         user2_display_name="Sam",
         user2_password="Password654321!",
-        currency="EUR",
+        currency="ARS",
         split_pct=50,
         gemini_api_key="test-dummy-api-key-gemini",
         business_enabled=True,
@@ -50,7 +50,7 @@ def test_onboarding_lifecycle(db_session):
     assert is_onboarded(db_session)
 
     # Verificar settings guardados
-    assert get_system_setting(db_session, "app_currency") == "EUR"
+    assert get_system_setting(db_session, "app_currency") == "ARS"
     assert get_system_setting(db_session, "split_pct") == 50
 
     business_cfg = get_system_setting(db_session, "business_config")
@@ -65,7 +65,7 @@ def test_onboarding_lifecycle(db_session):
     accounts = db_session.query(Account).all()
     assert len(accounts) >= 2
     for acc in accounts:
-        assert acc.currency == "EUR"
+        assert acc.currency == "ARS"
 
     categories = db_session.query(Category).all()
     assert len(categories) > 10
@@ -84,8 +84,10 @@ def test_onboarding_lifecycle(db_session):
 
 
 def test_onboarding_validation_rules(db_session):
-    # Moneda inválida (no alfabética o longitud distinta a 3)
-    with pytest.raises(ValueError, match="moneda debe ser un código alfabético de 3 letras"):
+    # Moneda no soportada como base
+    with pytest.raises(
+        ValueError, match="moneda base del libro mayor doméstico es estrictamente ARS"
+    ):
         initialize_instance(
             db_session,
             user1_username="alex",
@@ -94,7 +96,7 @@ def test_onboarding_validation_rules(db_session):
             user2_username="sam",
             user2_display_name="Sam",
             user2_password="Password654321!",
-            currency="PESOS",
+            currency="EUR",
         )
 
     # Porcentaje de reparto fuera de rango
@@ -107,7 +109,7 @@ def test_onboarding_validation_rules(db_session):
             user2_username="sam",
             user2_display_name="Sam",
             user2_password="Password654321!",
-            currency="USD",
+            currency="ARS",
             split_pct=150,
         )
 
@@ -121,7 +123,7 @@ def test_onboarding_validation_rules(db_session):
             user2_username="sam",
             user2_display_name="Sam",
             user2_password="Password654321!",
-            currency="USD",
+            currency="ARS",
         )
 
 
@@ -131,13 +133,21 @@ def test_setup_token_protection():
     from app.web.setup_routes import _is_setup_token_valid
 
     original_token = settings.SETUP_TOKEN
+    original_env = settings.ENVIRONMENT
     try:
-        # 1. Sin SETUP_TOKEN configurado, cualquier valor (o None) es válido
+        # 1. En desarrollo sin SETUP_TOKEN, cualquier valor (o None) es válido
+        settings.ENVIRONMENT = "development"
         settings.SETUP_TOKEN = None
         assert _is_setup_token_valid(None) is True
         assert _is_setup_token_valid("cualquier-token") is True
 
-        # 2. Con SETUP_TOKEN configurado, requiere coincidencia de tiempo constante
+        # 2. En producción sin SETUP_TOKEN, siempre es inválido (bloquea onboarding no protegido)
+        settings.ENVIRONMENT = "production"
+        settings.SETUP_TOKEN = None
+        assert _is_setup_token_valid(None) is False
+        assert _is_setup_token_valid("intento") is False
+
+        # 3. Con SETUP_TOKEN configurado, requiere coincidencia exacta de tiempo constante
         settings.SETUP_TOKEN = "secret-installation-token-12345"
         assert _is_setup_token_valid(None) is False
         assert _is_setup_token_valid("") is False
@@ -146,6 +156,7 @@ def test_setup_token_protection():
         assert _is_setup_token_valid("  secret-installation-token-12345  ") is True
     finally:
         settings.SETUP_TOKEN = original_token
+        settings.ENVIRONMENT = original_env
 
 
 def test_setup_rate_limiting():

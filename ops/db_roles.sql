@@ -116,6 +116,12 @@ BEGIN
 
     -- Auditoría (RN-37): estrictamente append-only (SELECT, INSERT; sin UPDATE ni DELETE ni TRUNCATE)
     IF to_regclass('public.audit_log') IS NOT NULL THEN
+        -- Separación de privilegios: aislar ownership de audit_log de finanzas_owner para que
+        -- el rol de migraciones no pueda desactivar triggers de inmutabilidad (H-06).
+        EXECUTE format('ALTER TABLE public.audit_log OWNER TO %I', CURRENT_USER);
+        GRANT SELECT, INSERT ON TABLE public.audit_log TO finanzas_owner;
+        REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.audit_log FROM finanzas_owner;
+
         GRANT SELECT, INSERT ON TABLE public.audit_log TO finanzas_app;
         REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.audit_log FROM finanzas_app;
 

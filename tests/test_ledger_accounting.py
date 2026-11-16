@@ -134,3 +134,30 @@ def test_transaction_voiding_and_audit_trail(accounting_db):
     assert audit_entry.user_id == 1
     assert audit_entry.after["status"] == "voided"
     assert audit_entry.after["reason"] == "Carga duplicada por error"
+
+
+def test_transaction_date_range_validation(accounting_db):
+    """Verifica que fechas o períodos fuera de 2000-2100 sean rechazados."""
+    from app.services.ledger_service import create_transaction
+
+    with pytest.raises(ValueError, match="fuera del rango contable permitido"):
+        create_transaction(
+            db=accounting_db,
+            kind="expense",
+            amount=Decimal("100.00"),
+            account_id=1,
+            tx_date=date(1995, 1, 1),
+            description="Fecha muy antigua",
+            user_id=1,
+        )
+
+    with pytest.raises(ValueError, match="fuera del rango contable permitido"):
+        create_transaction(
+            db=accounting_db,
+            kind="expense",
+            amount=Decimal("100.00"),
+            account_id=1,
+            tx_date=date(2150, 1, 1),
+            description="Fecha muy en el futuro",
+            user_id=1,
+        )

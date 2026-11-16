@@ -26,6 +26,9 @@ setup_router = APIRouter(prefix="/setup", tags=["setup"])
 
 def _is_setup_token_valid(provided_token: str | None) -> bool:
     expected = (settings.SETUP_TOKEN or "").strip()
+    is_prod = (settings.ENVIRONMENT or "").lower() in ("production", "prod")
+    if is_prod and not expected:
+        return False
     if not expected:
         return True
     if not provided_token or not provided_token.strip():
@@ -38,6 +41,15 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
     if is_onboarded(db):
         return RedirectResponse(url="/login", status_code=302)
 
+    is_prod = (settings.ENVIRONMENT or "").lower() in ("production", "prod")
+    token_missing_in_prod = is_prod and not (settings.SETUP_TOKEN or "").strip()
+    prod_error = (
+        "Por seguridad, en entornos de producción es obligatorio definir la variable SETUP_TOKEN "
+        "en el archivo .env antes de acceder al asistente de inicio."
+        if token_missing_in_prod
+        else None
+    )
+
     from app.web.app import templates
 
     csrf_token = generate_csrf_token()
@@ -46,10 +58,12 @@ async def setup_page(request: Request, db: Session = Depends(get_db)) -> Respons
         name="setup.html",
         context={
             "csrf_token": csrf_token,
-            "error": None,
-            "require_setup_token": bool(settings.SETUP_TOKEN),
+            "error": prod_error,
+            "require_setup_token": bool(settings.SETUP_TOKEN) or is_prod,
             "setup_token": "",
+            "blocked_in_prod": token_missing_in_prod,
         },
+        status_code=403 if token_missing_in_prod else 200,
     )
     response.set_cookie(
         "csrf_token",
@@ -114,7 +128,24 @@ async def process_setup(
             status_code=400,
         )
 
-    if settings.SETUP_TOKEN and not _is_setup_token_valid(setup_token):
+    is_prod = (settings.ENVIRONMENT or "").lower() in ("production", "prod")
+    if is_prod and not (settings.SETUP_TOKEN or "").strip():
+        from app.web.app import templates
+
+        return templates.TemplateResponse(
+            request=request,
+            name="setup.html",
+            context={
+                "csrf_token": generate_csrf_token(),
+                "error": "Por seguridad, en producción debe configurarse SETUP_TOKEN en .env.",
+                "require_setup_token": True,
+                "setup_token": "",
+                "blocked_in_prod": True,
+            },
+            status_code=403,
+        )
+
+    if (settings.SETUP_TOKEN or is_prod) and not _is_setup_token_valid(setup_token):
         record_failed_setup_attempt(client_ip)
         from app.web.app import templates
 
