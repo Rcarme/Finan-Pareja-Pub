@@ -216,9 +216,10 @@ def test_account_currency_whitelist(accounting_db):
 
 
 def test_alembic_migrations_execution(tmp_path):
-    """Verifica que las migraciones de Alembic ejecuten upgrade y downgrade sin errores."""
+    """Verifica integridad de esquema y supervivencia de CHECKs en ciclo de migraciones Alembic."""
     from alembic import command
     from alembic.config import Config
+    from sqlalchemy import inspect
 
     test_db_file = tmp_path / "test_migration_suite.db"
     cfg = Config("alembic.ini")
@@ -226,9 +227,33 @@ def test_alembic_migrations_execution(tmp_path):
 
     # 1. Upgrade a head debe crear el esquema e insertar los CHECKs idempotentemente
     command.upgrade(cfg, "head")
+    engine = create_engine(f"sqlite:///{test_db_file}")
+    insp = inspect(engine)
+    tx_checks_head = {c["name"] for c in insp.get_check_constraints("transactions")}
+    acc_checks_head = {c["name"] for c in insp.get_check_constraints("accounts")}
+    assert "chk_transaction_date_range" in tx_checks_head
+    assert "chk_transaction_amount_positive" in tx_checks_head
+    assert "chk_account_currency_valid" in acc_checks_head
+    engine.dispose()
 
-    # 2. Downgrade a 001 debe remover las restricciones nuevas
+    # 2. Downgrade a 001 debe remover las restricciones nuevas sin perder las preexistentes
     command.downgrade(cfg, "-1")
+    engine = create_engine(f"sqlite:///{test_db_file}")
+    insp = inspect(engine)
+    tx_checks_down = {c["name"] for c in insp.get_check_constraints("transactions")}
+    acc_checks_down = {c["name"] for c in insp.get_check_constraints("accounts")}
+    assert "chk_transaction_date_range" not in tx_checks_down
+    assert "chk_account_currency_valid" not in acc_checks_down
+    assert "chk_transaction_amount_positive" in tx_checks_down
+    engine.dispose()
 
-    # 3. Re-upgrade a head debe ser reproducible
+    # 3. Re-upgrade a head debe reintroducir las restricciones preservando integridad
     command.upgrade(cfg, "head")
+    engine = create_engine(f"sqlite:///{test_db_file}")
+    insp = inspect(engine)
+    tx_checks_reup = {c["name"] for c in insp.get_check_constraints("transactions")}
+    acc_checks_reup = {c["name"] for c in insp.get_check_constraints("accounts")}
+    assert "chk_transaction_date_range" in tx_checks_reup
+    assert "chk_transaction_amount_positive" in tx_checks_reup
+    assert "chk_account_currency_valid" in acc_checks_reup
+    engine.dispose()

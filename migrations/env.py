@@ -12,9 +12,14 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import app.models  # noqa: F401 - Registra todos los modelos SQLAlchemy en Base.metadata
-from app.core.config import settings
-from app.core.db import _to_engine_url
 from app.models.base import Base
+
+
+def _to_engine_url(db_url: str) -> str:
+    if db_url.startswith("postgresql://"):
+        return db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return db_url
+
 
 # Configuración de Alembic
 config = context.config
@@ -28,12 +33,19 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    """Resuelve la URL de conexión a la base de datos desde settings o alembic.ini."""
+    """Resuelve la URL de conexión a la base de datos desde cli, entorno o settings."""
     cli_url = config.get_main_option("sqlalchemy.url")
     if cli_url:
         return _to_engine_url(cli_url)
-    env_url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
-    return _to_engine_url(env_url)
+    env_url = os.environ.get("DATABASE_URL")
+    if env_url:
+        return _to_engine_url(env_url)
+    try:
+        from app.core.config import settings
+
+        return _to_engine_url(settings.DATABASE_URL)
+    except Exception:
+        return "sqlite:///./finanzas.db"
 
 
 def run_migrations_offline() -> None:
