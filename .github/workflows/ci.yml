@@ -86,4 +86,10 @@ jobs:
         DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123@127.0.0.1:5432/finanzas_test
         TEST_DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123@127.0.0.1:5432/finanzas_test
       run: |
-        python -m pytest tests/ -v
+        python -m pytest tests/ -v --tb=short 2>&1 | tee /tmp/pytest.log || {
+          echo "### Pytest Failure Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/pytest.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit 1
+        }
