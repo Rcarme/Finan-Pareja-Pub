@@ -19,11 +19,11 @@ jobs:
         env:
           POSTGRES_DB: finanzas_test
           POSTGRES_USER: finanzas_test
-          POSTGRES_PASSWORD: test_password_123!
+          POSTGRES_PASSWORD: test_password_123
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U finanzas_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -69,15 +69,21 @@ jobs:
       env:
         ENVIRONMENT: test
         APP_SECRET_KEY: ci_secret_key_at_least_32_characters_long!
-        DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123!@localhost:5432/finanzas_test
+        DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123@127.0.0.1:5432/finanzas_test
       run: |
-        python -m alembic upgrade head
+        python -m alembic --raiseerr upgrade head 2>&1 | tee /tmp/alembic.log || {
+          echo "### Alembic Migration Failed" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/alembic.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit 1
+        }
 
     - name: Run unit and integration tests
       env:
         ENVIRONMENT: test
         APP_SECRET_KEY: ci_secret_key_at_least_32_characters_long!
-        DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123!@localhost:5432/finanzas_test
-        TEST_DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123!@localhost:5432/finanzas_test
+        DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123@127.0.0.1:5432/finanzas_test
+        TEST_DATABASE_URL: postgresql+psycopg://finanzas_test:test_password_123@127.0.0.1:5432/finanzas_test
       run: |
         python -m pytest tests/ -v

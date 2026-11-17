@@ -19,8 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _get_existing_constraints(bind, table_name: str) -> set[str]:
-    inspector = inspect(bind)
     try:
+        inspector = inspect(bind)
         return {
             c["name"]
             for c in inspector.get_check_constraints(table_name)
@@ -35,6 +35,20 @@ def upgrade() -> None:
     dialect = bind.dialect.name
 
     def add_check_if_missing(table_name: str, constraint_name: str, condition: str) -> None:
+        if dialect == "postgresql":
+            sql = f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = '{constraint_name}'
+                ) THEN
+                    ALTER TABLE {table_name} ADD CONSTRAINT {constraint_name} CHECK ({condition});
+                END IF;
+            END $$;
+            """
+            op.execute(sql)
+            return
+
         existing = _get_existing_constraints(bind, table_name)
         if constraint_name in existing:
             return
@@ -45,6 +59,10 @@ def upgrade() -> None:
             op.create_check_constraint(constraint_name, table_name, condition)
 
     def drop_check_if_present(table_name: str, constraint_name: str) -> None:
+        if dialect == "postgresql":
+            op.execute(f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name};")
+            return
+
         existing = _get_existing_constraints(bind, table_name)
         if constraint_name not in existing:
             return
@@ -86,6 +104,10 @@ def downgrade() -> None:
     dialect = bind.dialect.name
 
     def drop_check_if_present(table_name: str, constraint_name: str) -> None:
+        if dialect == "postgresql":
+            op.execute(f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name};")
+            return
+
         existing = _get_existing_constraints(bind, table_name)
         if constraint_name not in existing:
             return
