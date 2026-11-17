@@ -42,7 +42,7 @@ def upgrade() -> None:
                 IF NOT EXISTS (
                     SELECT 1 FROM pg_constraint WHERE conname = '{constraint_name}'
                 ) THEN
-                    ALTER TABLE {table_name} ADD CONSTRAINT {constraint_name} CHECK ({condition});
+                    ALTER TABLE "{table_name}" ADD CONSTRAINT "{constraint_name}" CHECK ({condition});
                 END IF;
             END $$;
             """
@@ -60,7 +60,7 @@ def upgrade() -> None:
 
     def drop_check_if_present(table_name: str, constraint_name: str) -> None:
         if dialect == "postgresql":
-            op.execute(f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name};")
+            op.execute(f'ALTER TABLE "{table_name}" DROP CONSTRAINT IF EXISTS "{constraint_name}";')
             return
 
         existing = _get_existing_constraints(bind, table_name)
@@ -105,7 +105,7 @@ def downgrade() -> None:
 
     def drop_check_if_present(table_name: str, constraint_name: str) -> None:
         if dialect == "postgresql":
-            op.execute(f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name};")
+            op.execute(f'ALTER TABLE "{table_name}" DROP CONSTRAINT IF EXISTS "{constraint_name}";')
             return
 
         existing = _get_existing_constraints(bind, table_name)
